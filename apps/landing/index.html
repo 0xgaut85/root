@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Root Network — Get rewarded for the internet you don't use</title>
+    <meta
+      name="description"
+      content="Root Network turns idle home bandwidth into infrastructure for AI research. Share what you don't use, keep your data private, get rewarded."
+    />
+    <link rel="canonical" href="https://rootnetwork.co/" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="color-scheme" content="light only" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://rootnetwork.co/" />
+    <meta property="og:title" content="Root Network" />
+    <meta property="og:description" content="Get rewarded for the internet you don't use." />
+    <meta property="og:image" content="https://rootnetwork.co/assets/brand/og.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/png" href="/assets/brand/favicon.png" />
+    <link rel="preload" href="/fonts/die_grotesk_b_regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/die_grotesk_b_medium.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/dm_mono_regular.woff2" as="font" type="font/woff2" crossorigin />
+    <style>
+      /* First-paint safety: white page, no flash. Real styles load from /src/styles. */
+      html, body { height: 100%; }
+      body { margin: 0; background: #ffffff; color: #0a0a0a; overflow: hidden; }
+      #webgl { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; display: block; touch-action: none; }
+    </style>
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body class="is-loading">
+    <canvas id="webgl" role="img" aria-label="Root Network interactive loader: draw an R"></canvas>
+
+    <div id="loader-ui" aria-live="polite">
+      <div class="loader-counter" aria-hidden="true"><span data-counter>99</span></div>
+      <div class="loader-brand"><img src="/assets/brand/logo.png" alt="Root Network" width="28" height="36" /><span>ROOT NETWORK</span></div>
+      <div class="loader-hint" data-hint>
+        <span class="loader-hint__text" data-hint-text>LOADING</span>
+      </div>
+      <button class="loader-skip" data-skip type="button">Skip</button>
+    </div>
+
+    <header class="nav" data-nav>
+      <a class="nav__brand" href="/" aria-label="Root Network home">
+        <img src="/assets/brand/logo.png" alt="" width="22" height="28" />
+        <span>Root Network</span>
+      </a>
+      <nav class="nav__links" aria-label="Primary">
+        <a href="https://read.rootnetwork.co">Protocol</a>
+        <a href="https://use.rootnetwork.co">App</a>
+        <a class="nav__cta" href="https://use.rootnetwork.co">Start earning</a>
+      </nav>
+    </header>
+
+    <main id="page" data-page>
+      <section class="welcome" data-welcome>
+        <div class="welcome__inner">
+          <p class="eyebrow" data-welcome-eyebrow>Root Network</p>
+          <h1 class="welcome__title" data-welcome-title>Welcome to<br />Root Network</h1>
+          <p class="welcome__sub" data-welcome-sub>Get rewarded for the internet you don't use.</p>
+          <div class="scroll-cue" data-scroll-cue>
+            <span></span>
+            <small>Scroll</small>
+          </div>
+        </div>
+      </section>
+
+      <section class="frames" data-frames>
+        <!-- Scenes are injected from src/scroll/scenes.ts -->
+      </section>
+
+      <section class="cta" data-cta>
+        <div class="cta__inner">
+          <img class="cta__logo" src="/assets/brand/logo.png" alt="" width="64" height="84" />
+          <h2>Put your idle internet<br />to work.</h2>
+          <p>Install Root, keep browsing, get rewarded. Your data never leaves your device.</p>
+          <div class="cta__actions">
+            <a class="btn btn--primary" href="https://use.rootnetwork.co">Start earning</a>
+            <a class="btn btn--ghost" href="https://read.rootnetwork.co">Read the protocol</a>
+          </div>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <div class="footer__inner">
+          <div class="footer__brand">
+            <img src="/assets/brand/logo.png" alt="" width="20" height="26" />
+            <span>Root Network</span>
+          </div>
+          <nav class="footer__links" aria-label="Footer">
+            <a href="https://read.rootnetwork.co">Protocol</a>
+            <a href="https://use.rootnetwork.co">App</a>
+            <a href="https://x.com/rootnetwork" rel="noopener">X</a>
+            <a href="mailto:hello@rootnetwork.co">Contact</a>
+          </nav>
+          <p class="footer__legal">© <span data-year></span> Root Network. All rights reserved.</p>
+        </div>
+      </footer>
+    </main>
+  </body>
+</html>
