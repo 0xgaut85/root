@@ -2,8 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Root Network — Get rewarded for the internet you don't use</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Root Network</title>
     <meta
       name="description"
       content="Root Network turns idle home bandwidth into infrastructure for AI research. Share what you don't use, keep your data private, get rewarded."
@@ -21,17 +21,20 @@
     <link rel="preload" href="/fonts/die_grotesk_b_regular.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/die_grotesk_b_medium.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="preload" href="/fonts/dm_mono_regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/tiempos_headline_light.woff2" as="font" type="font/woff2" crossorigin />
     <style>
       /* First-paint safety: white page, no flash. Real styles load from /src/styles. */
       html, body { height: 100%; }
       body { margin: 0; background: #ffffff; color: #0a0a0a; overflow: hidden; }
-      #webgl { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1; display: block; touch-action: none; }
+      #webgl, #xp { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+      #webgl { z-index: 30; }
+      #xp { z-index: 1; }
     </style>
     <script type="module" src="/src/main.ts"></script>
   </head>
   <body class="is-loading">
+    <!-- Loader: draw an R -->
     <canvas id="webgl" role="img" aria-label="Root Network interactive loader: draw an R"></canvas>
-
     <div id="loader-ui" aria-live="polite">
       <div class="loader-counter" aria-hidden="true"><span data-counter>99</span></div>
       <div class="loader-brand"><img src="/assets/brand/logo.png" alt="Root Network" width="28" height="36" /><span>ROOT NETWORK</span></div>
@@ -41,62 +44,52 @@
       <button class="loader-skip" data-skip type="button">Skip</button>
     </div>
 
-    <header class="nav" data-nav>
-      <a class="nav__brand" href="/" aria-label="Root Network home">
-        <img src="/assets/brand/logo.png" alt="" width="22" height="28" />
-        <span>Root Network</span>
-      </a>
-      <nav class="nav__links" aria-label="Primary">
-        <a href="https://read.rootnetwork.co">Protocol</a>
-        <a href="https://use.rootnetwork.co">App</a>
-        <a class="nav__cta" href="https://use.rootnetwork.co">Start earning</a>
-      </nav>
-    </header>
+    <!-- Experience: scroll-scrubbed WebGL chapters -->
+    <main id="stage" data-stage>
+      <canvas id="xp" aria-hidden="true"></canvas>
+      <div class="overlay" data-overlay>
+        <!-- typography beats are injected from src/experience -->
+      </div>
 
-    <main id="page" data-page>
-      <section class="welcome" data-welcome>
-        <div class="welcome__inner">
-          <p class="eyebrow" data-welcome-eyebrow>Root Network</p>
-          <h1 class="welcome__title" data-welcome-title>Welcome to<br />Root Network</h1>
-          <p class="welcome__sub" data-welcome-sub>Get rewarded for the internet you don't use.</p>
-          <div class="scroll-cue" data-scroll-cue>
-            <span></span>
-            <small>Scroll</small>
-          </div>
+      <header class="nav" data-nav>
+        <a class="nav__brand" href="/" aria-label="Root Network home">
+          <img src="/assets/brand/logo.png" alt="" width="22" height="28" />
+          <span>Root Network</span>
+        </a>
+        <nav class="nav__links" aria-label="Primary">
+          <a href="https://read.rootnetwork.co">Protocol</a>
+          <a href="https://use.rootnetwork.co">App</a>
+          <a class="nav__cta" href="https://use.rootnetwork.co">Start earning</a>
+        </nav>
+      </header>
+
+      <div class="hud" data-hud aria-hidden="true">
+        <div class="hud__rail" data-rail>
+          <!-- ticks injected -->
         </div>
-      </section>
+        <div class="hud__label"><span data-hud-index>00</span><span data-hud-label>Welcome</span></div>
+      </div>
 
-      <section class="frames" data-frames>
-        <!-- Scenes are injected from src/scroll/scenes.ts -->
-      </section>
-
-      <section class="cta" data-cta>
-        <div class="cta__inner">
-          <img class="cta__logo" src="/assets/brand/logo.png" alt="" width="64" height="84" />
-          <h2>Put your idle internet<br />to work.</h2>
-          <p>Install Root, keep browsing, get rewarded. Your data never leaves your device.</p>
-          <div class="cta__actions">
-            <a class="btn btn--primary" href="https://use.rootnetwork.co">Start earning</a>
-            <a class="btn btn--ghost" href="https://read.rootnetwork.co">Read the protocol</a>
-          </div>
-        </div>
-      </section>
-
-      <footer class="footer">
-        <div class="footer__inner">
-          <div class="footer__brand">
-            <img src="/assets/brand/logo.png" alt="" width="20" height="26" />
-            <span>Root Network</span>
-          </div>
-          <nav class="footer__links" aria-label="Footer">
-            <a href="https://read.rootnetwork.co">Protocol</a>
-            <a href="https://use.rootnetwork.co">App</a>
-            <a href="https://x.com/rootnetwork" rel="noopener">X</a>
-            <a href="mailto:hello@rootnetwork.co">Contact</a>
-          </nav>
-          <p class="footer__legal">© <span data-year></span> Root Network. All rights reserved.</p>
-        </div>
-      </footer>
+      <button class="scroll-pill" data-scroll-pill type="button" aria-label="Scroll to continue">
+        <i></i><span>Scroll</span>
+      </button>
     </main>
+
+    <!-- Coming soon -->
+    <div class="soon" data-soon role="dialog" aria-modal="true" aria-labelledby="soon-title" hidden>
+      <div class="soon__card">
+        <p class="soon__eyebrow">Root Network</p>
+        <h2 class="soon__title" id="soon-title">Coming <em>soon.</em></h2>
+        <p class="soon__body">We're still growing. Follow <a href="https://x.com/rootnetworkco" rel="noopener" target="_blank">@rootnetworkco</a> to know when the roots reach you.</p>
+        <button class="btn btn--primary" type="button" data-soon-close>Got it</button>
+      </div>
+    </div>
+
+    <noscript>
+      <div style="padding: 40px; font-family: system-ui">
+        <h1>Root Network</h1>
+        <p>Get rewarded for the internet you don't use. Enable JavaScript to view the experience, or read the <a href="https://read.rootnetwork.co">protocol</a>.</p>
+      </div>
+    </noscript>
   </body>
 </html>

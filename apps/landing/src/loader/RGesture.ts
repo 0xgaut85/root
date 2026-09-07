@@ -319,7 +319,41 @@ export class RGesture {
     const left = (cxFrac * W) / H - w / 2;
     const top = cyFrac - h / 2;
     this.guide = guideStrokesUnit().map((s) => s.map((p) => ({ x: left + p.x * h, y: top + p.y * h, id: p.id })));
-    this.guideCoverRadius = h * 0.09;
+    // generous: users do not need to be precise, roughly following the letter is enough
+    this.guideCoverRadius = h * 0.14;
+  }
+
+  /**
+   * "Finished" test: both ends of every guide stroke (stem, bowl, leg) have a
+   * user point nearby. Precision is generous; this only makes sure the letter
+   * has been drawn to its ends rather than left halfway.
+   */
+  private strokeEndsTouched(points: Pt[]): boolean {
+    const r = this.guideCoverRadius * 1.3;
+    const r2 = r * r;
+    for (const s of this.guide) {
+      for (const e of [s[0], s[s.length - 1]]) {
+        let ok = false;
+        for (const p of points) {
+          const dx = p.x - e.x;
+          const dy = p.y - e.y;
+          if (dx * dx + dy * dy <= r2) {
+            ok = true;
+            break;
+          }
+        }
+        if (!ok) return false;
+      }
+    }
+    return true;
+  }
+
+  /** Points where a hand-drawn R naturally ends (leg end, stem bottom, stem top). */
+  private guideEndPoints(): Pt[] {
+    if (this.guide.length < 3) return [];
+    const stem = this.guide[0];
+    const leg = this.guide[2];
+    return [leg[leg.length - 1], stem[0], stem[stem.length - 1]];
   }
 
   pointerDown(clientX: number, clientY: number) {
@@ -452,16 +486,29 @@ export class RGesture {
       this.nearFired = true;
       this.onNearComplete?.();
     }
-    // every part of the letter (stem, bowl, leg) must be touched
-    if (cov >= 0.8 && perStroke.every((c) => c >= 0.5)) {
-      this.complete(pts);
-      return;
+
+    // Every part of the letter (stem, bowl, leg) must be touched, but nothing
+    // needs to be precise. While the pointer is still down we only complete
+    // when the pen is at a natural end of the letter, so the gesture never
+    // "goes through" halfway along a stroke.
+    const traced = cov >= 0.66 && perStroke.every((c) => c >= 0.4) && this.strokeEndsTouched(pts);
+    if (traced) {
+      if (onUp) {
+        this.complete(pts);
+        return;
+      }
+      const pen = pts[pts.length - 1];
+      const endR = this.guideCoverRadius * 0.6;
+      if (this.guideEndPoints().some((e) => dist(e, pen) <= endR)) {
+        this.complete(pts);
+        return;
+      }
     }
 
     // $P only on pointer up (cheaper, and avoids premature matches)
     if (onUp) {
       const r = this.recognize(pts);
-      if (r.name === 'R' && r.score >= 0.8) {
+      if (r.name === 'R' && r.score >= 0.74) {
         this.complete(pts);
         return;
       }

@@ -1,7 +1,7 @@
 import './styles/main.css';
 import gsap from 'gsap';
-import { scenes, renderScenes } from './scroll/scenes';
-import { initSmoothScroll, initFrames, startScroll, stopScroll } from './scroll/experience';
+import type { Experience } from './experience/Experience';
+import type { Chapter } from './experience/Chapter';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 
@@ -13,78 +13,116 @@ const hint = $('[data-hint]');
 const hintText = $('[data-hint-text]');
 const skipBtn = $<HTMLButtonElement>('[data-skip]');
 const nav = $('[data-nav]');
-const page = $('[data-page]');
-const framesRoot = $('[data-frames]');
+const stage = $('[data-stage]');
+const hud = $('[data-hud]');
+const rail = $('[data-rail]');
+const hudIndex = $('[data-hud-index]');
+const hudLabel = $('[data-hud-label]');
+const pill = $('[data-scroll-pill]');
 
-$('[data-year]').textContent = String(new Date().getFullYear());
+/* ---------------- "Coming soon" for the app / protocol links ---------------- */
 
-/* ---------------- Page (welcome + frames) ---------------- */
+const soon = $('[data-soon]');
+const showSoon = () => {
+  soon.hidden = false;
+  requestAnimationFrame(() => soon.classList.add('is-open'));
+  $('[data-soon-close]').focus();
+};
+const hideSoon = () => {
+  soon.classList.remove('is-open');
+  setTimeout(() => (soon.hidden = true), 260);
+};
+document.addEventListener('click', (e) => {
+  const target = e.target as HTMLElement;
+  if (target.closest('[data-soon-close]') || (target.closest('[data-soon]') && !target.closest('.soon__card'))) {
+    e.preventDefault();
+    hideSoon();
+    return;
+  }
+  const a = target.closest<HTMLElement>('a[href], [data-soon-trigger]');
+  if (!a) return;
+  const href = a.getAttribute('href') || '';
+  if (a.hasAttribute('data-soon-trigger') || /use\.rootnetwork\.co|read\.rootnetwork\.co/.test(href)) {
+    e.preventDefault();
+    showSoon();
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !soon.hidden) hideSoon();
+});
 
-async function probeVideos(): Promise<Set<string>> {
-  const ok = new Set<string>();
-  const urls = scenes.map((s) => s.video).filter(Boolean) as string[];
-  await Promise.all(
-    urls.map(async (u) => {
-      try {
-        const r = await fetch(u, { method: 'HEAD' });
-        if (r.ok && (r.headers.get('content-type') || '').startsWith('video')) ok.add(u);
-      } catch {
-        /* ignore */
-      }
-    }),
-  );
-  return ok;
+/* ---------------- Experience (after the loader) ---------------- */
+
+let xpPromise: Promise<Experience> | null = null;
+
+function loadExperience(): Promise<Experience> {
+  if (xpPromise) return xpPromise;
+  xpPromise = (async () => {
+    const [{ Experience }, { buildChapters, manifest, extraAssets }] = await Promise.all([import('./experience/Experience'), import('./experience/chapters')]);
+    const xp = new Experience({
+      canvas: $<HTMLCanvasElement>('#xp'),
+      overlay: $('[data-overlay]'),
+      chapters: buildChapters(),
+      onChapter: onChapter,
+      onProgress: onProgress,
+      onFirstScroll: () => pill.classList.remove('is-visible'),
+    });
+    await Promise.all([xp.preload(manifest), extraAssets(xp.ctx.assets)]);
+    if (import.meta.env.DEV) (window as unknown as { __xp: Experience }).__xp = xp;
+    return xp;
+  })();
+  return xpPromise;
 }
 
-function splitWords(el: HTMLElement) {
-  const html = el.innerHTML;
-  const parts = html.split(/<br\s*\/?>/i);
-  el.innerHTML = parts
-    .map((line) =>
-      line
-        .trim()
-        .split(/\s+/)
-        .map((w) => `<span class="word"><span>${w}</span></span>`)
-        .join(' '),
-    )
-    .join('<br />');
-  return Array.from(el.querySelectorAll<HTMLElement>('.word > span'));
+const TICKS = 31;
+const ticks: HTMLElement[] = [];
+function buildRail(chapters: Chapter[]) {
+  rail.innerHTML = '';
+  ticks.length = 0;
+  const per = (TICKS - 1) / chapters.length;
+  for (let i = 0; i < TICKS; i++) {
+    const t = document.createElement('i');
+    if (Math.abs((i % per) - 0) < 1e-6) t.classList.add('is-major');
+    rail.appendChild(t);
+    ticks.push(t);
+  }
 }
 
-let pageReady: Promise<void> | null = null;
-function preparePage() {
-  if (pageReady) return pageReady;
-  pageReady = probeVideos().then((videos) => {
-    renderScenes(framesRoot, videos);
-  });
-  return pageReady;
+let currentTick = -1;
+function onProgress(p: number, max: number) {
+  const k = Math.round((p / max) * (TICKS - 1));
+  if (k === currentTick) return;
+  if (currentTick >= 0) ticks[currentTick]?.classList.remove('is-current');
+  currentTick = k;
+  ticks[k]?.classList.add('is-current');
 }
 
-async function revealWelcome() {
-  await preparePage();
+function onChapter(index: number, chapter: Chapter) {
+  document.body.classList.toggle('is-dark', chapter.dark);
+  hudIndex.textContent = String(index).padStart(2, '0');
+  hudLabel.textContent = chapter.label;
+}
+
+async function showExperience() {
+  const xp = await loadExperience();
+  xp.prepare();
+  buildRail(xp.chapters);
   document.body.classList.remove('is-loading');
-  page.classList.add('is-visible');
-  window.scrollTo(0, 0);
-
-  const title = $('[data-welcome-title]');
-  const words = splitWords(title);
-  const sub = $('[data-welcome-sub]');
-  const eyebrow = $('[data-welcome-eyebrow]');
-  const cue = $('[data-scroll-cue]');
-
-  initSmoothScroll();
-  stopScroll();
-
-  const tl = gsap.timeline({ defaults: { ease: 'power4.out' } });
-  tl.fromTo(eyebrow, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.8 }, 0.1);
-  tl.to(words, { y: 0, duration: 1.2, stagger: 0.07 }, 0.15);
-  tl.to(sub, { opacity: 1, y: 0, duration: 1 }, 0.7);
-  tl.add(() => nav.classList.add('is-visible'), 0.9);
-  tl.to(cue, { opacity: 1, duration: 0.8 }, 1.3);
-  tl.add(() => {
-    initFrames(framesRoot);
-    startScroll();
-  }, 1.1);
+  stage.classList.add('is-visible');
+  xp.start();
+  xp.reveal(1.4);
+  window.setTimeout(() => {
+    nav.classList.add('is-visible');
+    hud.classList.add('is-visible');
+  }, 700);
+  window.setTimeout(() => pill.classList.add('is-visible'), 1800);
+  pill.addEventListener('click', () => xp.scroller.goTo(1));
+  // if the visitor sits at a chapter start for a while, nudge again
+  window.setInterval(() => {
+    const atStart = Math.abs(xp.scroller.value - Math.round(xp.scroller.value)) < 0.01 && xp.scroller.value < xp.scroller.max - 0.5;
+    if (xp.scroller.idleMs > 9000 && atStart) pill.classList.add('is-visible');
+    else if (xp.scroller.idleMs < 200) pill.classList.remove('is-visible');
+  }, 1000);
 }
 
 /* ---------------- Loader ---------------- */
@@ -98,13 +136,22 @@ function supportsWebGL() {
   }
 }
 
+const params = new URLSearchParams(location.search);
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const skipLoader = new URLSearchParams(location.search).has('skip') || reduceMotion || !supportsWebGL();
+const skipLoader = params.has('skip') || reduceMotion || !supportsWebGL();
 
 if (skipLoader) {
   canvas.classList.add('is-removed');
   loaderUi.classList.add('is-removed');
-  revealWelcome();
+  showExperience().then(async () => {
+    // ?skip=3 jumps straight to a chapter (handy for reviewing)
+    const to = Number(params.get('skip'));
+    if (to > 0) {
+      const xp = await loadExperience();
+      xp.scroller.target = to;
+      xp.scroller.value = to;
+    }
+  });
 } else {
   import('./loader/Loader').then(({ Loader }) => {
     let shownNumber = -1;
@@ -131,7 +178,7 @@ if (skipLoader) {
       handUrl: '/assets/models/hand.glb',
       frostUrl: '/assets/textures/frost.webp',
       frostNormalUrl: '/assets/textures/frost_normal.webp',
-      preload: [scenes[0].image, scenes[1].image],
+      preload: [],
       onProgress: (p) => {
         const n = Math.max(99 - Math.floor(p * 33) * 3, 0);
         if (n !== shownNumber) {
@@ -141,22 +188,20 @@ if (skipLoader) {
       },
       onReadyToDraw: () => {
         readyAt = performance.now();
-        // counter -> brand swap
         const tl = gsap.timeline();
         tl.to(counter, { yPercent: -110, opacity: 0, duration: 0.7, ease: 'power3.inOut' });
         tl.to(brand, { opacity: 1, x: 0, duration: 0.7, ease: 'power3.out' }, 0.3);
-        // hint under the ghost R
         positionHint();
         setHint('DRAW AN R');
         tl.to(hint, { opacity: 1, duration: 0.8, ease: 'power2.out' }, 0.6);
         skipTimer = window.setTimeout(showSkip, 9000);
-        // start preparing the page in the background
-        preparePage();
+        // start loading the experience while the visitor draws
+        loadExperience();
       },
       onNearComplete: () => setHint('KEEP GOING'),
       onAttemptFailed: (n) => {
         loader.clearTrail();
-        setHint(n === 1 ? 'TRACE THE R' : 'ALMOST — TRACE THE R');
+        setHint(n === 1 ? 'TRACE THE R' : 'ALMOST \u2014 TRACE THE R');
         if (n >= 2) showSkip();
       },
       onComplete: () => {
@@ -168,7 +213,7 @@ if (skipLoader) {
       onWhite: () => {
         loaderUi.classList.add('is-hidden');
         canvas.classList.add('is-hidden');
-        revealWelcome();
+        showExperience();
         window.setTimeout(() => {
           canvas.classList.add('is-removed');
           loaderUi.classList.add('is-removed');
@@ -178,7 +223,6 @@ if (skipLoader) {
     });
 
     function positionHint() {
-      // guide is centred at (0.5, cy) with height hFrac of the viewport; place hint under it
       const mobile = window.innerWidth < 768;
       const hFrac = mobile ? 0.34 : 0.42;
       const cy = mobile ? 0.42 : 0.46;
@@ -193,7 +237,6 @@ if (skipLoader) {
       loader.skip();
     });
 
-    // Safety valve: if nothing happens 45s after ready, offer skip more prominently
     window.setInterval(() => {
       if (!done && readyAt && performance.now() - readyAt > 45000) showSkip();
     }, 5000);

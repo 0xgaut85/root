@@ -9,3 +9,8 @@ Thumbs.db
 
 # local scratch media (not part of any app)
 /videotoedit.mp4
+
+# generation scratch and reference captures
+/_gen/
+/_frame_study/
+/root-network-x-intro*.mp4
