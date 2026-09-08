@@ -2,7 +2,7 @@
 
 There is exactly one revenue stream: **AI labs pay the network for bandwidth, and Root Network keeps 20% of what they pay.** The other 80% goes to contributors. There is no token, no advertising, and no sale of data.
 
-<div class="rn-split"><div class="rn-split__a">80% · paid to contributors</div><div class="rn-split__b">20% · Root Network</div></div>
+<div class="rn-split"><div class="rn-split__a">80% · paid to contributors</div><div class="rn-split__b">20% · Root</div></div>
 <div class="rn-split-legend"><span>Split by verified bytes, weighted by region and reliability</span><span>Routers, validators, payments, support, compliance</span></div>
 
 ## The flow of a dollar
