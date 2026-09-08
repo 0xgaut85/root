@@ -45,13 +45,18 @@ createServer((req, res) => {
       st = statSync(file);
     }
   } catch {
-    // SPA fallback
-    file = join(root, 'index.html');
+    // Clean URLs for static pages (/privacy -> privacy.html), then SPA fallback.
     try {
+      file = normalize(join(root, `${pathname}.html`));
       st = statSync(file);
     } catch {
-      res.writeHead(404).end('Not found');
-      return;
+      file = join(root, 'index.html');
+      try {
+        st = statSync(file);
+      } catch {
+        res.writeHead(404).end('Not found');
+        return;
+      }
     }
   }
   const ext = extname(file).toLowerCase();

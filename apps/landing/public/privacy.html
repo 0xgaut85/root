@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Privacy Policy · Root Network</title>
+    <meta name="description" content="Privacy policy for the Root Network browser extension and dashboard." />
+    <meta name="robots" content="noindex" />
+    <link rel="preload" href="/fonts/die_grotesk_b_regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/die_grotesk_b_medium.woff2" as="font" type="font/woff2" crossorigin />
+    <style>
+      @font-face { font-family: 'Die Grotesk'; src: url('/fonts/die_grotesk_b_regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+      @font-face { font-family: 'Die Grotesk'; src: url('/fonts/die_grotesk_b_medium.woff2') format('woff2'); font-weight: 500; font-display: swap; }
+      @font-face { font-family: 'DM Mono'; src: url('/fonts/dm_mono_regular.woff2') format('woff2'); font-weight: 400; font-display: swap; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; background: #fff; color: #0a0a0a; }
+      body { font-family: 'Die Grotesk', ui-sans-serif, system-ui, -apple-system, sans-serif; font-size: 16px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+      .wrap { max-width: 720px; margin: 0 auto; padding: 56px 24px 96px; }
+      .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; font-weight: 500; }
+      .brand i { display: block; width: 11px; height: 16px; background: #0a0a0a; }
+      .eyebrow { font-family: 'DM Mono', monospace; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #8a8a8a; margin: 56px 0 10px; }
+      h1 { font-size: 40px; font-weight: 500; letter-spacing: -0.03em; line-height: 1.05; margin: 0 0 12px; }
+      .lede { color: #5a5a5a; font-size: 18px; margin: 0 0 40px; }
+      h2 { font-size: 20px; font-weight: 500; letter-spacing: -0.015em; margin: 40px 0 10px; }
+      p, li { color: #2a2a2a; }
+      ul { padding-left: 20px; }
+      li { margin: 6px 0; }
+      table { width: 100%; border-collapse: collapse; font-size: 15px; margin: 12px 0 8px; }
+      th, td { text-align: left; padding: 10px 0; border-bottom: 1px solid #ececec; vertical-align: top; }
+      th { font-weight: 500; color: #8a8a8a; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; }
+      td:first-child { width: 34%; font-weight: 500; }
+      code { font-family: 'DM Mono', monospace; font-size: 13.5px; background: #f4f4f2; padding: 1px 6px; border-radius: 5px; }
+      a { color: inherit; }
+      .foot { margin-top: 64px; padding-top: 20px; border-top: 1px solid #ececec; font-size: 13px; color: #8a8a8a; display: flex; gap: 18px; flex-wrap: wrap; }
+    </style>
+  </head>
+  <body>
+    <main class="wrap">
+      <a class="brand" href="/"><i></i>Root Network</a>
+
+      <div class="eyebrow">Privacy policy · effective 8 September 2026</div>
+      <h1>We sell bandwidth, not you.</h1>
+      <p class="lede">
+        This policy covers the Root Network browser extension, the dashboard at earn.rootnetwork.co and the protocol documentation at read.rootnetwork.co. It is written to be read.
+      </p>
+
+      <h2>What Root Network does</h2>
+      <p>
+        Root Network lets you share the part of your home internet connection you are not using. Verified AI research labs route requests for public web content through participating connections and pay for the bandwidth they use. You keep 80% of what they pay. The extension exists only for this purpose: to relay sealed traffic within the limit you set, and to report how much it relayed so you can be paid.
+      </p>
+
+      <h2>What the extension can and cannot do</h2>
+      <ul>
+        <li>It <b>does not</b> read, record or modify your browsing. It has no access to the pages you visit, your history, cookies, form data or passwords. It requests no permission that would allow this.</li>
+        <li>It <b>does not</b> inject content, ads or scripts into any website. Its only content script runs on <code>earn.rootnetwork.co</code>, so the dashboard can detect and pair the extension.</li>
+        <li>It <b>does not</b> use your device for computation, mining or anything other than relaying traffic.</li>
+        <li>It <b>does</b> relay encrypted ("sealed") requests. It cannot decrypt them. Neither can we. Only the destination website and the lab that sent the request can read the contents.</li>
+        <li>It <b>never</b> uses more than the share of your connection you allow, and it stops entirely when you pause it or your monthly cap is reached.</li>
+      </ul>
+
+      <h2>Information we collect</h2>
+      <table>
+        <thead><tr><th>Data</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td>Account identifier (email address, or a wallet address if you sign in with a wallet)</td><td>To create your account and let you sign in. Authentication is handled by Privy.</td></tr>
+          <tr><td>Device pairing token, browser name and extension version</td><td>To link the extension to your account and show the right device in your dashboard.</td></tr>
+          <tr><td>Bytes relayed, measured throughput, allocation and pause state</td><td>To verify your contribution, compute what you are owed and let you control your node.</td></tr>
+          <tr><td>Approximate region (country) derived from your IP address</td><td>Labs request bandwidth by region. We store the country, not the IP address, alongside your contribution records.</td></tr>
+          <tr><td>Payout wallet address and payout history</td><td>To pay you.</td></tr>
+          <tr><td>Referral code you used, if any</td><td>To credit referral bonuses.</td></tr>
+        </tbody>
+      </table>
+      <p>We do not collect the content of relayed traffic, the destinations of relayed requests tied to your identity, your browsing activity, or any personal information beyond the list above.</p>
+
+      <h2>How we use it</h2>
+      <p>To run the network, verify and pay contributions, prevent abuse (for example, one person running many fake nodes), provide support, and meet legal obligations. We do not sell personal information. We do not use it for advertising. We do not build profiles of you.</p>
+
+      <h2>Sharing</h2>
+      <ul>
+        <li><b>AI labs</b> receive the public web content their requests fetch and an anonymous node identifier. They never receive your account, email, wallet or IP address.</li>
+        <li><b>Service providers</b> that host our infrastructure (Railway), handle sign-in (Privy) and process payouts. Each receives only what it needs to provide its service.</li>
+        <li><b>Authorities</b>, if required by law.</li>
+      </ul>
+
+      <h2>Retention</h2>
+      <p>Contribution records are kept for as long as your account exists so your earnings history stays available. Node telemetry (per-heartbeat throughput samples) is deleted after 30 days. If you delete your account, personal information is removed within 30 days, except records we must keep for tax or legal reasons.</p>
+
+      <h2>Your controls</h2>
+      <ul>
+        <li>Change your allocation, pause sharing or set a monthly cap at any time from the extension or dashboard.</li>
+        <li>Unpair a device from the extension popup or the dashboard. Unpairing revokes its token immediately.</li>
+        <li>Uninstalling the extension stops all relaying. Nothing remains on your device.</li>
+        <li>Request a copy or deletion of your data by emailing <a href="mailto:privacy@rootnetwork.co">privacy@rootnetwork.co</a>.</li>
+      </ul>
+
+      <h2>Security</h2>
+      <p>Traffic is encrypted end to end between the lab and the destination; nodes carry opaque envelopes. Device tokens are stored hashed. Dashboard and API traffic uses TLS. Report vulnerabilities to <a href="mailto:security@rootnetwork.co">security@rootnetwork.co</a>.</p>
+
+      <h2>Children</h2>
+      <p>Root Network is not directed at anyone under 18 and we do not knowingly collect information from minors.</p>
+
+      <h2>Changes</h2>
+      <p>If this policy changes in a way that matters, we will say so in the dashboard before the change takes effect. The effective date at the top always reflects the current version.</p>
+
+      <h2>Contact</h2>
+      <p>Root Network · <a href="mailto:privacy@rootnetwork.co">privacy@rootnetwork.co</a> · <a href="https://x.com/rootnetworkco">@rootnetworkco</a></p>
+
+      <div class="foot">
+        <span>© 2026 Root Network</span>
+        <a href="/">rootnetwork.co</a>
+      </div>
+    </main>
+  </body>
+</html>

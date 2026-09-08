@@ -172,7 +172,7 @@ export function Settings() {
           <Card tight>
             <div className="sidebar__links" style={{ padding: 0, flexWrap: 'wrap' }}>
               <a href="https://read.rootnetwork.co">Protocol docs</a>
-              <a href="https://read.rootnetwork.co/data/privacy-and-security">Privacy</a>
+              <a href="https://rootnetwork.co/privacy">Privacy</a>
               <a href="https://read.rootnetwork.co/data/acceptable-use">Acceptable use</a>
               <a href="mailto:support@rootnetwork.co">Support</a>
             </div>

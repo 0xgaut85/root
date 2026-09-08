@@ -39,7 +39,7 @@ export function Login() {
           )}
         </motion.div>
         <div className="login__foot">
-          <a href="https://read.rootnetwork.co/data/privacy-and-security">Privacy</a>
+          <a href="https://rootnetwork.co/privacy">Privacy</a>
           <a href="https://read.rootnetwork.co/data/acceptable-use">Terms</a>
           <a href="https://x.com/rootnetworkco" target="_blank" rel="noopener">
             @rootnetworkco

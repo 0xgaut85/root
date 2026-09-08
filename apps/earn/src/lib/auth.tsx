@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             walletChainType: 'ethereum-only',
           },
           embeddedWallets: { ethereum: { createOnLogin: 'users-without-wallets' } },
-          legal: { termsAndConditionsUrl: 'https://read.rootnetwork.co/data/acceptable-use', privacyPolicyUrl: 'https://read.rootnetwork.co/data/privacy-and-security' },
+          legal: { termsAndConditionsUrl: 'https://read.rootnetwork.co/data/acceptable-use', privacyPolicyUrl: 'https://rootnetwork.co/privacy' },
         }}
       >
         <PrivyBridge>{children}</PrivyBridge>
