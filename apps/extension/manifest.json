@@ -27,10 +27,10 @@
     "type": "module"
   },
   "permissions": ["storage", "alarms"],
-  "host_permissions": ["https://earn.rootnetwork.co/*", "http://localhost/*", "http://127.0.0.1/*"],
+  "host_permissions": ["https://earn.rootnetwork.co/*", "https://earn-production-7927.up.railway.app/*", "http://localhost/*", "http://127.0.0.1/*"],
   "content_scripts": [
     {
-      "matches": ["https://earn.rootnetwork.co/*", "http://localhost/*", "http://127.0.0.1/*"],
+      "matches": ["https://earn.rootnetwork.co/*", "https://earn-production-7927.up.railway.app/*", "http://localhost/*", "http://127.0.0.1/*"],
       "js": ["content.js"],
       "run_at": "document_start"
     }

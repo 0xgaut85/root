@@ -1,6 +1,5 @@
 node_modules/
 dist/
-public/downloads/
 .env
 .env.*
 !.env.example
