@@ -1,29 +1,43 @@
 # Payouts
 
-Earnings are held as a dollar balance in your account and can be withdrawn to the wallet you connected when signing in.
+Earnings are held as a dollar balance in your account and can be withdrawn to any EVM address you choose, in the dollar you prefer.
 
 ## Balance
 
 Your **settled balance** is the sum of all verified settlement windows minus previous withdrawals. It is shown at the top of your dashboard and is available to withdraw at any time above the minimum.
 
+## Two ways to be paid
+
+Root Network pays in fully-reserved dollar stablecoins, on two rails. You pick one in **Settings → Payouts** and can switch at any time.
+
+| | USDC on Base | USDG on Robinhood Chain |
+| --- | --- | --- |
+| Issuer | Circle | Paxos (Global Dollar Network) |
+| Network | Base, Coinbase's Ethereum L2 | Robinhood Chain |
+| Address format | `0x…` (any EVM wallet) | `0x…` (Robinhood wallet or any EVM wallet) |
+| Typical settlement | Under a minute | Under a minute |
+| Fee | None | None |
+
+Both are 1:1 dollar tokens. One `0x` address works for either rail, so you can switch rails without changing your address.
+
 ## Withdrawing
 
-1. Open **Settings → Payout** in your dashboard.
-2. Confirm the destination wallet. This is the wallet linked to your account at sign-in; you can change it, which triggers a 24-hour hold as a safety measure.
-3. Enter an amount and confirm.
+1. Open **Settings → Payouts** in your dashboard.
+2. Pick your rail and enter your payout address. If you signed in with a wallet, you can use it in one tap.
+3. Press **Withdraw** and confirm the amount.
 
-Withdrawals are paid in **USDC** on the network selected in your payout settings. Most complete within minutes; all complete within 24 hours.
+Withdrawals are sent from the Root Network treasury, `0x3e32A1b643A81927802E7Fa202709395Ce8D1821`. Every payout leaving the treasury is listed on the **Data** page of the dashboard, so you can verify yours on-chain.
 
 | | |
 | --- | --- |
 | Minimum withdrawal | $5.00 |
 | Fee | None from Root Network. Network gas is covered by us |
 | Frequency | Unlimited |
-| Currency | USDC |
+| Currency | USDC (Base) or USDG (Robinhood Chain) |
 
 ## Automatic payouts
 
-You can enable automatic payouts to send your balance to your wallet whenever it crosses a threshold you choose ($10, $25, $50 or $100). This is the recommended setting for contributors who do not want to think about it.
+You can enable automatic payouts to send your balance to your address whenever it crosses a threshold you choose ($10, $25, $50 or $100). This is the recommended setting for contributors who do not want to think about it.
 
 ## Eligibility
 
@@ -31,4 +45,4 @@ Root Network pays contributors in every jurisdiction where it can do so lawfully
 
 ## Taxes
 
-Payouts are income in most jurisdictions. Your dashboard provides a downloadable statement of all settled earnings and withdrawals per calendar year. Root Network does not withhold taxes on your behalf.
+Payouts are income in most jurisdictions. A statement of all settled earnings and withdrawals per calendar year is available from support. Root Network does not withhold taxes on your behalf.

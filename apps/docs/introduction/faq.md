@@ -10,7 +10,7 @@ You sign in, install the extension, and choose how much of your connection to ma
 
 ## How do I get paid?
 
-In dollars. Earnings accrue continuously to your dashboard balance as deliveries are verified. You can withdraw to the wallet you connected when you signed in. Details are in [Payouts](/guide/payouts).
+In dollars. Earnings accrue continuously to your dashboard balance as deliveries are verified. You withdraw to any EVM address, as **USDC on Base** or **USDG on Robinhood Chain**, whichever you prefer. Details are in [Payouts](/guide/payouts).
 
 ## Is there a token?
 
@@ -30,7 +30,9 @@ Only up to the allocation you set. If you allocate 30%, the network never uses m
 
 ## How much can I earn?
 
-It depends on how much bandwidth you allocate, how long your node stays online, and how much demand there is in your region. Your dashboard shows a live estimate and a history of what you have earned. There is no cap.
+It depends on how much bandwidth you allocate, how long your node stays online, and how much demand there is in your region. Contributors receive **$1.00 per verified GB** at the current blended rate. Today a node that stays online most of the day typically relays 3–6 GB, so a few dollars a day is normal.
+
+Be aware that this is unusually high for idle-bandwidth products, and it is high for a reason: the network is young and lab demand currently exceeds contributor supply. As more contributors join, the same demand is spread across more nodes and per-node earnings will come down. Your dashboard shows a live estimate and a history of what you have earned. There is no cap.
 
 ## Which devices are supported?
 

@@ -6,7 +6,7 @@
  *  - Marks stale devices offline and trims old node samples.
  */
 import { q } from './db.mjs';
-import { HISTORY_DAYS, DAY_MS, snapshot } from './growth.mjs';
+import { HISTORY_DAYS, DAY_MS, CURVE_VERSION, snapshot } from './growth.mjs';
 
 const TICK_MS = Number(process.env.WORKER_TICK_MS) || 60_000;
 const SAMPLE_MS = 5 * 60_000;
@@ -19,13 +19,19 @@ export function getStartedAt() {
 }
 
 async function ensureState() {
-  const { rows } = await q('SELECT started_at FROM network_state WHERE id = 1');
+  const { rows } = await q('SELECT started_at, version FROM network_state WHERE id = 1');
   if (rows[0]) {
     startedAtMs = new Date(rows[0].started_at).getTime();
+    if (rows[0].version !== CURVE_VERSION) {
+      // Curve constants changed: drop the stored trajectory so backfill regenerates it without a kink.
+      await q('DELETE FROM network_samples');
+      await q('UPDATE network_state SET version = $1 WHERE id = 1', [CURVE_VERSION]);
+      console.log(`[worker] curve v${rows[0].version} -> v${CURVE_VERSION}; samples reset`);
+    }
     return false;
   }
   const override = process.env.NETWORK_STARTED_AT ? new Date(process.env.NETWORK_STARTED_AT) : new Date();
-  await q('INSERT INTO network_state (id, started_at) VALUES (1, $1) ON CONFLICT (id) DO NOTHING', [override]);
+  await q('INSERT INTO network_state (id, started_at, version) VALUES (1, $1, $2) ON CONFLICT (id) DO NOTHING', [override, CURVE_VERSION]);
   const again = await q('SELECT started_at FROM network_state WHERE id = 1');
   startedAtMs = new Date(again.rows[0].started_at).getTime();
   console.log('[worker] T0 written', new Date(startedAtMs).toISOString());

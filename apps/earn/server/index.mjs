@@ -8,6 +8,7 @@ import { network } from './routes/network.mjs';
 import { me } from './routes/me.mjs';
 import { ext } from './routes/ext.mjs';
 import { privyConfigured, devAuthEnabled } from './auth.mjs';
+import { TREASURY_ADDRESS, publicRails } from './rails.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const distDir = join(here, '..', 'dist');
@@ -40,6 +41,8 @@ app.get('/api/config', (_req, res) =>
     privyAppId: process.env.VITE_PRIVY_APP_ID || process.env.PRIVY_APP_ID || null,
     devAuth: devAuthEnabled,
     publicUrl: process.env.PUBLIC_URL || null,
+    treasury: TREASURY_ADDRESS,
+    rails: publicRails(),
   }),
 );
 app.use('/api/network', network);

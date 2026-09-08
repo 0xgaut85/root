@@ -24,7 +24,7 @@ Rates are for the default region pool (North America and Western Europe). Other 
 
 - **Prepaid** balances for new labs; usage is deducted at each settlement window.
 - **Monthly invoicing** for labs with an established history, net 30.
-- Payment by wire or USDC.
+- Payment by wire or USDC on Base.
 
 ## Spend controls
 

@@ -9,7 +9,12 @@ import { CONTRIBUTOR_RATE_PER_GB, diurnal, noise } from './growth.mjs';
 
 const GB = 1e9;
 
-/** Base daily demand per node at 100% allocation, before regional/seed variation. */
+/**
+ * Base daily demand per node at 100% allocation, before regional/seed variation.
+ * Coherent with the public trajectory: the network moves ≈5.6 GB per contributor-day
+ * (growth.mjs ARPU / lab rate) over ≈1.28 nodes of which ~60% are online at any hour,
+ * i.e. ≈7 GB per online node-day.
+ */
 const BASE_DAILY_CAP_GB = 7.5;
 
 export function dailyCapBytes(device, allocation) {

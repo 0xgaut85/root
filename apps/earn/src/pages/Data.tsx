@@ -1,8 +1,10 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useMemo, useState } from 'react';
-import { AreaChart, Card, CardHead, Delta, Num, Segmented, Stat } from '../components/ui';
+import { AreaChart, Card, CardHead, Delta, Icon, Num, Segmented, Stat } from '../components/ui';
+import { NodeMap } from '../components/NodeMap';
 import { useNetwork } from '../lib/hooks';
-import { bytes, dayLabel, gb, int, mbps, timeLabel, usd, usdCompact } from '../lib/format';
+import { ago, bytes, dayLabel, gb, int, mbps, shortAddr, timeLabel, usd, usdCompact } from '../lib/format';
+import { RAILS, RAIL_IDS, RailMark } from '../lib/rails';
 
 type Metric = 'users' | 'grossUsd' | 'gbTotal' | 'activeNodes';
 
@@ -16,6 +18,7 @@ export function Data() {
   const xFmt = (t: number) => `${dayLabel(t)} ${timeLabel(t)}`;
 
   const maxRegion = data ? Math.max(...data.regions.map((r) => r.nodes)) : 1;
+  const topRegions = useMemo(() => (data ? [...data.regions].sort((a, b) => b.nodes - a.nodes).slice(0, 12) : []), [data]);
 
   return (
     <div className="page">
@@ -32,6 +35,11 @@ export function Data() {
         <Stat label="Nodes online" value={n ? int(n.activeNodes) : '—'} loading={!n} deltaLabel={n ? `${Math.round((n.activeNodes / n.nodes) * 100)}% of nodes` : ''} />
         <Stat label="Bandwidth shared" value={n ? gb(n.gbTotal, 0) : '—'} loading={!n} delta={data?.delta24h?.gbTotal ?? null} deltaLabel="GB · 24h" />
       </div>
+
+      <Card dark className="card--map">
+        <CardHead title="Node map" hint={n ? `${int(n.activeNodes)} of ${int(n.nodes)} nodes online · ${mbps(n.throughputMbps)} flowing through the network` : 'Where the network lives right now.'} />
+        {data ? <NodeMap regions={data.regions} continents={data.continents} activeNodes={data.now.activeNodes} nodes={data.now.nodes} /> : <div className="sk" style={{ height: 320, borderRadius: 14 }} />}
+      </Card>
 
       <div className="grid grid--main">
         <Card>
@@ -127,7 +135,7 @@ export function Data() {
         <Card>
           <CardHead title="Regions" hint="Nodes by country and the lab rate for that region." />
           <div className="bars">
-            {data?.regions.slice(0, 10).map((r) => (
+            {topRegions.map((r) => (
               <div key={r.code} className="bar">
                 <span className="bar__code">{r.code}</span>
                 <div className="bar__track">
@@ -138,6 +146,62 @@ export function Data() {
                 </span>
               </div>
             ))}
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid grid--main">
+        <Card>
+          <CardHead title="Treasury payouts" hint={data ? `${usd(data.treasury.paidOutUsd, 0)} withdrawn by contributors so far` : undefined} />
+          <div className="feed">
+            <AnimatePresence initial={false}>
+              {data?.treasury.payouts.map((p) => (
+                <motion.div key={`${p.t}-${p.to}`} className="feed__row feed__row--pay" layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ type: 'spring', stiffness: 380, damping: 34 }}>
+                  <RailMark id={p.rail} size={22} />
+                  <span className="feed__node">
+                    {shortAddr(p.to)} <span className="feed__meta">· {RAILS[p.rail].asset}</span>
+                  </span>
+                  <span className="feed__meta">{ago(p.t)}</span>
+                  <span className="feed__b">{usd(p.usd)}</span>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        </Card>
+
+        <Card>
+          <CardHead title="Payout rails" hint="Contributors choose the dollar they are paid in. Both settle from one treasury." />
+          <div className="list">
+            {RAIL_IDS.map((id) => {
+              const r = RAILS[id];
+              return (
+                <div key={id} className="row">
+                  <div className="row__main" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <RailMark id={id} size={34} />
+                    <div style={{ minWidth: 0 }}>
+                      <div className="row__t">
+                        {r.asset} <span style={{ color: 'var(--ink-3)', fontWeight: 400 }}>· {r.assetName}</span>
+                      </div>
+                      <div className="row__s">on {r.chain}</div>
+                    </div>
+                  </div>
+                  <div className="row__r">{data ? `${Math.round((data.treasury.payouts.filter((p) => p.rail === id).length / Math.max(1, data.treasury.payouts.length)) * 100)}%` : ''}</div>
+                </div>
+              );
+            })}
+            <div className="row">
+              <div className="row__main">
+                <div className="row__t">Treasury</div>
+                <div className="row__s mono">{data?.treasury.address ?? '—'}</div>
+              </div>
+              <div className="row__r">
+                {data && (
+                  <a className="btn btn--ghost btn--sm" href={`https://basescan.org/address/${data.treasury.address}`} target="_blank" rel="noreferrer">
+                    Basescan <Icon name="out" size={14} />
+                  </a>
+                )}
+              </div>
+            </div>
           </div>
         </Card>
       </div>

@@ -13,15 +13,23 @@ export type NetworkSnapshot = {
   progress: number;
 };
 export type NetworkPoint = { t: number; users: number; nodes: number; activeNodes: number; gbTotal: number; grossUsd: number };
-export type NetworkRegion = { code: string; name: string; nodes: number; gb: number; ratePerGb: number };
+export type Continent = 'americas' | 'europe' | 'asia' | 'africa';
+export type NetworkRegion = { code: string; name: string; continent: Continent; share: number; nodes: number; gb: number; ratePerGb: number };
+export type NetworkContinent = { id: Continent; name: string; share: number; nodes: number };
 export type NetworkActivity = { t: number; region: string; bytes: number; ms: number; node: string; verified: boolean };
+export type RailId = 'base-usdc' | 'robinhood-usdg';
+export type Rail = { id: RailId; asset: string; assetName: string; chain: string; chainId: number | null; explorer: string | null; token: string | null };
+export type TreasuryPayout = { t: number; to: string; usd: number; rail: RailId };
 export type Network = {
   now: NetworkSnapshot;
   delta24h: { users: number; nodes: number; gbTotal: number; grossUsd: number } | null;
   series: NetworkPoint[];
   regions: NetworkRegion[];
+  continents: NetworkContinent[];
   activity: NetworkActivity[];
-  meta: { startedAt: number; historyDays: number; growthDays: number; contributorShare: number };
+  treasury: { address: string; paidOutUsd: number; payouts: TreasuryPayout[] };
+  rails: Rail[];
+  meta: { startedAt: number; historyDays: number; growthDays: number; contributorShare: number; arpuPerDay: number };
 };
 
 export type Device = {
@@ -43,6 +51,7 @@ export type Me = {
     id: string;
     email: string | null;
     wallet: string | null;
+    payoutRail: RailId;
     displayName: string | null;
     referralCode: string;
     allocation: number;
@@ -59,9 +68,10 @@ export type Me = {
     todayUsd: number;
     todayBytes: number;
   };
+  treasury: string;
   devices: Device[];
   hours: { t: number; usd: number; bytes: number }[];
-  payouts: { id: number; usd: number; wallet: string; status: string; createdAt: string }[];
+  payouts: { id: number; usd: number; wallet: string; rail: RailId; txHash: string | null; status: string; createdAt: string }[];
 };
 
 let tokenGetter: () => Promise<string | null> = async () => null;
@@ -90,10 +100,12 @@ async function request<T>(path: string, init: RequestInit = {}, auth = true): Pr
 }
 
 export const api = {
-  config: () => request<{ privyAppId: string | null; devAuth: boolean; publicUrl: string | null }>('/api/config', {}, false),
+  config: () => request<{ privyAppId: string | null; devAuth: boolean; publicUrl: string | null; treasury: string; rails: Rail[] }>('/api/config', {}, false),
   network: () => request<Network>('/api/network', {}, false),
   me: () => request<Me>('/api/me'),
-  updateMe: (patch: Partial<{ allocation: number; monthlyBudgetGb: number | null; autoPayoutUsd: number | null; wallet: string | null; email: string | null; displayName: string | null }>) =>
+  updateMe: (
+    patch: Partial<{ allocation: number; monthlyBudgetGb: number | null; autoPayoutUsd: number | null; wallet: string | null; payoutRail: RailId; email: string | null; displayName: string | null }>,
+  ) =>
     request<Me>('/api/me', { method: 'PATCH', body: JSON.stringify(patch) }),
   pairCode: () => request<{ code: string; expiresAt: number }>('/api/me/pair', { method: 'POST' }),
   updateDevice: (id: string, patch: Partial<{ name: string; paused: boolean; allocation: number | null }>) =>

@@ -17,7 +17,7 @@ The 20% is a flat network fee. It does not vary by contributor, region or volume
 ## What the 20% pays for
 
 - **Routers and validators**: the infrastructure that selects nodes, seals traffic, verifies deliveries and computes settlements, deployed in multiple regions.
-- **Payments**: withdrawals in USDC with gas covered by the network.
+- **Payments**: withdrawals in USDC (Base) or USDG (Robinhood Chain) with gas covered by the network.
 - **Lab onboarding and compliance**: identity verification, usage agreements, and enforcement of the acceptable use policy.
 - **Support** for contributors and labs.
 - **Development** of the extension, dashboard, desktop and mobile nodes.
@@ -39,7 +39,7 @@ Per gigabyte at a representative contracted rate:
 | Contributor pool | $1.00 |
 | Root Network | $0.25 |
 
-Labs pay a premium over data-centre bandwidth because residential access is what they need and cannot get elsewhere. Contributors are paid a rate that no consumer product for idle bandwidth has offered before, because we do not sit between them and the labs with anything more than the fee above.
+Labs pay a premium over data-centre bandwidth because residential access is what they need and cannot get elsewhere; $1.25 is at the low end of what residential access sells for today (commercial residential proxy networks list between roughly $1 and $8 per GB). Contributors are paid a rate that no consumer product for idle bandwidth has offered before (most pay $0.10–$0.50 per GB and keep the rest), because we do not sit between them and the labs with anything more than the fee above.
 
 ## Transparency
 

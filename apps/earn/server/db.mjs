@@ -103,5 +103,10 @@ export async function migrate() {
       status      text NOT NULL DEFAULT 'pending',
       created_at  timestamptz NOT NULL DEFAULT now()
     );
+
+    -- v2: payout rails (USDC on Base / USDG on Robinhood Chain)
+    ALTER TABLE users   ADD COLUMN IF NOT EXISTS payout_rail text NOT NULL DEFAULT 'base-usdc';
+    ALTER TABLE payouts ADD COLUMN IF NOT EXISTS rail text NOT NULL DEFAULT 'base-usdc';
+    ALTER TABLE payouts ADD COLUMN IF NOT EXISTS tx_hash text;
   `);
 }

@@ -4,6 +4,8 @@ import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useDebouncedSetting, useMe } from '../lib/hooks';
 import { shortAddr, usd } from '../lib/format';
+import { RAILS, RAIL_IDS, RailMark, railLabel } from '../lib/rails';
+import type { RailId } from '../lib/api';
 import { PayoutSheet } from './Overview';
 
 export function Settings() {
@@ -14,6 +16,7 @@ export function Settings() {
   const [budgetOpen, setBudgetOpen] = useState(false);
   const [payoutOpen, setPayoutOpen] = useState(false);
   const [walletInput, setWalletInput] = useState('');
+  const [railInput, setRailInput] = useState<RailId>('base-usdc');
   const [budgetInput, setBudgetInput] = useState('');
 
   const writeAlloc = useCallback(async (v: number) => setData(await api.updateMe({ allocation: v })), [setData]);
@@ -60,17 +63,55 @@ export function Settings() {
           </Card>
 
           <Card>
-            <CardHead title="Payouts" hint="Earnings are paid in USDC. Minimum withdrawal $5. No fees." />
+            <CardHead title="Payouts" hint="Choose the dollar you want to be paid in. Minimum withdrawal $5. Gas is covered by the network." />
+            <div className="rails">
+              {RAIL_IDS.map((id) => {
+                const r = RAILS[id];
+                const on = (me?.user.payoutRail ?? 'base-usdc') === id;
+                return (
+                  <button
+                    key={id}
+                    className={`rail ${on ? 'on' : ''}`}
+                    disabled={!me}
+                    onClick={() => !on && save({ payoutRail: id }, `Payouts in ${railLabel(id)}`)}
+                    aria-pressed={on}
+                  >
+                    <RailMark id={id} size={34} />
+                    <div className="rail__t">
+                      <b>{r.asset}</b>
+                      <span>on {r.chain}</span>
+                    </div>
+                    <span className="rail__check">
+                      <Icon name="check" size={14} />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="card__hint" style={{ margin: '10px 0 14px' }}>{RAILS[me?.user.payoutRail ?? 'base-usdc'].note}</p>
             <div className="list">
-              <button className="row row--btn" style={{ borderTop: 0, paddingTop: 0 }} onClick={() => { setWalletInput(me?.user.wallet ?? privyWallet ?? ''); setWalletOpen(true); }}>
+              <button className="row row--btn" onClick={() => { setWalletInput(me?.user.wallet ?? privyWallet ?? ''); setRailInput(me?.user.payoutRail ?? 'base-usdc'); setWalletOpen(true); }}>
                 <div className="row__main">
-                  <div className="row__t">Payout wallet</div>
-                  <div className="row__s">{me?.user.wallet ? me.user.wallet : privyWallet ? `Use your signed-in wallet ${shortAddr(privyWallet)}` : 'Add an EVM or Solana address'}</div>
+                  <div className="row__t">Payout address</div>
+                  <div className="row__s">{me?.user.wallet ? me.user.wallet : privyWallet ? `Use your signed-in wallet ${shortAddr(privyWallet)}` : 'Add an EVM (0x…) address'}</div>
                 </div>
                 <div className="row__r">
                   {me?.user.wallet ? shortAddr(me.user.wallet) : 'Add'} <Icon name="chev" size={16} />
                 </div>
               </button>
+              <div className="row">
+                <div className="row__main">
+                  <div className="row__t">Paid from</div>
+                  <div className="row__s mono">{me?.treasury ?? '—'}</div>
+                </div>
+                <div className="row__r">
+                  {me?.treasury && (
+                    <a className="btn btn--ghost btn--sm" href={`https://basescan.org/address/${me.treasury}`} target="_blank" rel="noreferrer">
+                      Treasury
+                    </a>
+                  )}
+                </div>
+              </div>
               <div className="row">
                 <div className="row__main">
                   <div className="row__t">Automatic payout</div>
@@ -111,9 +152,14 @@ export function Settings() {
                 <div className="list">
                   {me.payouts.map((p) => (
                     <div key={p.id} className="row" style={{ padding: '10px 0' }}>
-                      <div className="row__main">
-                        <div className="row__t">{usd(p.usd)}</div>
-                        <div className="row__s mono">{shortAddr(p.wallet)}</div>
+                      <div className="row__main" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <RailMark id={p.rail} size={26} />
+                        <div style={{ minWidth: 0 }}>
+                          <div className="row__t">
+                            {usd(p.usd)} <span style={{ color: 'var(--ink-3)', fontWeight: 400 }}>{RAILS[p.rail]?.asset ?? 'USDC'}</span>
+                          </div>
+                          <div className="row__s mono">{shortAddr(p.wallet)}</div>
+                        </div>
                       </div>
                       <div className="row__r">
                         <span className="pill" style={{ height: 22, fontSize: 9.5 }}>
@@ -182,9 +228,23 @@ export function Settings() {
 
       {/* Wallet sheet */}
       <Sheet open={walletOpen} onClose={() => setWalletOpen(false)}>
-        <h3>Payout wallet</h3>
-        <p>USDC is sent here when you withdraw. EVM (0x…) and Solana addresses are accepted.</p>
-        <input className="input input--mono" placeholder="0x… or Solana address" value={walletInput} onChange={(e) => setWalletInput(e.target.value)} autoFocus />
+        <h3>Payout address</h3>
+        <p>Withdrawals are sent here from the Root Network treasury. One EVM address works for both rails; pick the dollar you want to receive.</p>
+        <div className="rails rails--sheet">
+          {RAIL_IDS.map((id) => (
+            <button key={id} className={`rail ${railInput === id ? 'on' : ''}`} onClick={() => setRailInput(id)} aria-pressed={railInput === id}>
+              <RailMark id={id} size={30} />
+              <div className="rail__t">
+                <b>{RAILS[id].asset}</b>
+                <span>on {RAILS[id].chain}</span>
+              </div>
+              <span className="rail__check">
+                <Icon name="check" size={14} />
+              </span>
+            </button>
+          ))}
+        </div>
+        <input className="input input--mono" placeholder="0x…" value={walletInput} onChange={(e) => setWalletInput(e.target.value)} autoFocus spellCheck={false} />
         {privyWallet && walletInput !== privyWallet && (
           <button className="link" style={{ background: 'none', border: 0, padding: '10px 0 0', color: 'var(--ink-2)', textDecoration: 'underline' }} onClick={() => setWalletInput(privyWallet)}>
             Use my signed-in wallet {shortAddr(privyWallet)}
@@ -195,7 +255,8 @@ export function Settings() {
             className="btn btn--primary btn--lg"
             style={{ flex: 1 }}
             onClick={async () => {
-              if (await save({ wallet: walletInput.trim() || null }, walletInput.trim() ? 'Wallet saved' : 'Wallet removed')) setWalletOpen(false);
+              const w = walletInput.trim();
+              if (await save({ wallet: w || null, payoutRail: railInput }, w ? `Payouts in ${railLabel(railInput)} to ${shortAddr(w)}` : 'Address removed')) setWalletOpen(false);
             }}
           >
             Save

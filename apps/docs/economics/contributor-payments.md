@@ -23,7 +23,8 @@ A node's payment for the window is `pool × (node_weight / total_weight)`.
 
 - **Settlement**: hourly. Balances update at the end of each window.
 - **Withdrawal**: on demand above $5, or automatic at a threshold you choose.
-- **Currency**: USDC. Gas is paid by the network.
+- **Currency**: USDC on Base or USDG on Robinhood Chain, your choice. Gas is paid by the network.
+- **Source**: every payout is sent from the network treasury (`0x3e32A1b643A81927802E7Fa202709395Ce8D1821`) and listed on the Data page.
 
 ## Referral bonuses
 

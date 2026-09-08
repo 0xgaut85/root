@@ -120,7 +120,8 @@ function render(st) {
   $('#pauseHint').textContent = on ? 'Your node is available to the network' : 'Paused. Resume any time.';
 
   const n = s?.network;
-  $('#net').textContent = n ? `${n.activeNodes.toLocaleString()} nodes online · ${(n.throughputMbps / 1000).toFixed(2)} Gbps network` : '';
+  const tp = n ? (n.throughputMbps >= 1000 ? `${(n.throughputMbps / 1000).toFixed(2)} Gbps` : `${Math.round(n.throughputMbps)} Mbps`) : '';
+  $('#net').textContent = n ? `${n.activeNodes.toLocaleString()} nodes online · ${tp} network` : '';
 }
 
 async function refresh() {

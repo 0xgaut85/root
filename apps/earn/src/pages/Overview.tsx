@@ -5,6 +5,7 @@ import { api, type Me } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useDebouncedSetting, useMe, useNetwork } from '../lib/hooks';
 import { ago, bytes, mbps, timeLabel, usd } from '../lib/format';
+import { RAILS, RailMark } from '../lib/rails';
 
 export function Overview() {
   const { data: me, setData, refresh } = useMe(5000);
@@ -227,10 +228,11 @@ export function PayoutSheet({ open, onClose, me, onDone }: { open: boolean; onCl
       setBusy(false);
     }
   };
+  const rail = RAILS[me?.user.payoutRail ?? 'base-usdc'];
   return (
     <Sheet open={open} onClose={onClose}>
       <h3>Withdraw</h3>
-      <p>Your available balance is paid in USDC to your payout wallet. Gas is covered by the network.</p>
+      <p>Your available balance is sent from the Root Network treasury to your payout address. Gas is covered by the network.</p>
       <div className="list" style={{ marginBottom: 18 }}>
         <div className="row">
           <div className="row__main">
@@ -242,10 +244,27 @@ export function PayoutSheet({ open, onClose, me, onDone }: { open: boolean; onCl
         </div>
         <div className="row">
           <div className="row__main">
+            <div className="row__t">Paid in</div>
+          </div>
+          <div className="row__r" style={{ color: 'var(--ink)', gap: 8 }}>
+            <RailMark id={rail.id} size={22} />
+            {rail.asset} <span style={{ color: 'var(--ink-3)' }}>on {rail.chain}</span>
+          </div>
+        </div>
+        <div className="row">
+          <div className="row__main">
             <div className="row__t">To</div>
           </div>
           <div className="row__r mono" style={{ fontSize: 12.5 }}>
-            {me?.user.wallet ? `${me.user.wallet.slice(0, 8)}…${me.user.wallet.slice(-6)}` : 'No wallet set'}
+            {me?.user.wallet ? `${me.user.wallet.slice(0, 8)}…${me.user.wallet.slice(-6)}` : 'No address set'}
+          </div>
+        </div>
+        <div className="row">
+          <div className="row__main">
+            <div className="row__t">From</div>
+          </div>
+          <div className="row__r mono" style={{ fontSize: 12.5 }}>
+            {me?.treasury ? `${me.treasury.slice(0, 8)}…${me.treasury.slice(-6)}` : '—'}
           </div>
         </div>
       </div>
@@ -255,7 +274,7 @@ export function PayoutSheet({ open, onClose, me, onDone }: { open: boolean; onCl
         </button>
       ) : (
         <Link to="/settings" className="btn btn--primary btn--block btn--lg" onClick={onClose}>
-          Add a payout wallet
+          Add a payout address
         </Link>
       )}
     </Sheet>

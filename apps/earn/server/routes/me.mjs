@@ -4,6 +4,7 @@ import { q } from '../db.mjs';
 import { requireUser } from '../auth.mjs';
 import { DEVICE_STALE_MS } from '../worker.mjs';
 import { dailyCapBytes } from '../sim.mjs';
+import { DEFAULT_RAIL, TREASURY_ADDRESS, isEvmAddress, isRail } from '../rails.mjs';
 
 export const me = Router();
 me.use(requireUser);
@@ -53,7 +54,7 @@ async function summary(user) {
        GROUP BY hour ORDER BY hour ASC`,
       [user.id],
     ),
-    q(`SELECT id, usd, wallet, status, created_at FROM payouts WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`, [user.id]),
+    q(`SELECT id, usd, wallet, rail, tx_hash, status, created_at FROM payouts WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`, [user.id]),
   ]);
   const paidOut = payouts.rows.filter((p) => p.status !== 'failed').reduce((a, p) => a + Number(p.usd), 0);
   const earned = Number(totals.rows[0].usd);
@@ -62,6 +63,7 @@ async function summary(user) {
       id: user.id,
       email: user.email,
       wallet: user.wallet,
+      payoutRail: user.payout_rail || DEFAULT_RAIL,
       displayName: user.display_name,
       referralCode: user.referral_code,
       allocation: user.allocation,
@@ -78,9 +80,18 @@ async function summary(user) {
       todayUsd: Number(today.rows[0].usd),
       todayBytes: Number(today.rows[0].bytes),
     },
+    treasury: TREASURY_ADDRESS,
     devices: devices.rows.map((d) => publicDevice(d, user.allocation)),
     hours: hours.rows.map((h) => ({ t: new Date(h.hour).getTime(), usd: Number(h.usd), bytes: Number(h.bytes) })),
-    payouts: payouts.rows.map((p) => ({ id: p.id, usd: Number(p.usd), wallet: p.wallet, status: p.status, createdAt: p.created_at })),
+    payouts: payouts.rows.map((p) => ({
+      id: p.id,
+      usd: Number(p.usd),
+      wallet: p.wallet,
+      rail: p.rail || DEFAULT_RAIL,
+      txHash: p.tx_hash,
+      status: p.status,
+      createdAt: p.created_at,
+    })),
   };
 }
 
@@ -114,8 +125,12 @@ me.patch('/', async (req, res) => {
   }
   if (b.wallet !== undefined) {
     const w = b.wallet === null ? null : String(b.wallet).trim();
-    if (w !== null && !/^(0x[0-9a-fA-F]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/.test(w)) return res.status(400).json({ error: 'bad wallet' });
+    if (w !== null && !isEvmAddress(w)) return res.status(400).json({ error: 'Enter a valid EVM address (0x… 40 hex characters)' });
     add('wallet', w);
+  }
+  if (b.payoutRail !== undefined) {
+    if (!isRail(b.payoutRail)) return res.status(400).json({ error: 'unknown payout rail' });
+    add('payout_rail', b.payoutRail);
   }
   if (b.email !== undefined) add('email', b.email === null ? null : String(b.email).slice(0, 200));
   if (b.displayName !== undefined) add('display_name', b.displayName === null ? null : String(b.displayName).slice(0, 60));
@@ -165,6 +180,12 @@ me.post('/payouts', async (req, res) => {
   if (!req.user.wallet) return res.status(400).json({ error: 'Add a payout wallet first' });
   if (!Number.isFinite(usd) || usd < MIN_PAYOUT_USD) return res.status(400).json({ error: `Minimum payout is $${MIN_PAYOUT_USD}` });
   if (usd > s.balance.availableUsd + 1e-9) return res.status(400).json({ error: 'Insufficient balance' });
-  await q('INSERT INTO payouts (user_id, usd, wallet, status) VALUES ($1, $2, $3, $4)', [req.user.id, usd, req.user.wallet, 'pending']);
+  await q('INSERT INTO payouts (user_id, usd, wallet, rail, status) VALUES ($1, $2, $3, $4, $5)', [
+    req.user.id,
+    usd,
+    req.user.wallet,
+    req.user.payout_rail || DEFAULT_RAIL,
+    'pending',
+  ]);
   res.json(await summary(req.user));
 });

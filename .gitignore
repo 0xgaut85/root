@@ -1,5 +1,8 @@
 node_modules/
 dist/
+
+# private keys for node payout wallets (pushed to Railway by apps/earn/scripts/gen-wallets.mjs)
+/secrets/
 .DS_Store
 Thumbs.db
 *.log
