@@ -1,0 +1,13 @@
+{
+  "name": "Root Network",
+  "short_name": "Root",
+  "description": "Put your idle internet to work.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f4f2",
+  "theme_color": "#f4f4f2",
+  "icons": [
+    { "src": "/icons/icon192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

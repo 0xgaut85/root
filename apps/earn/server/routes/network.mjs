@@ -1,0 +1,99 @@
+import { Router } from 'express';
+import { q } from '../db.mjs';
+import { getStartedAt } from '../worker.mjs';
+import { REGIONS, snapshot, noise, HISTORY_DAYS, GROWTH_DAYS, CONTRIBUTOR_SHARE } from '../growth.mjs';
+
+export const network = Router();
+
+function pickRegion(r) {
+  let acc = 0;
+  for (const reg of REGIONS) {
+    acc += reg.share;
+    if (r <= acc) return reg;
+  }
+  return REGIONS[REGIONS.length - 1];
+}
+
+/** Synthetic live delivery feed, deterministic per 4-second bucket. */
+function activity(nowMs, count = 14) {
+  const out = [];
+  let t = nowMs - 800;
+  const base = Math.floor(nowMs / 4000);
+  for (let i = 0; i < count; i++) {
+    const b = base - i;
+    const gap = 1800 + noise(b, 3) * 7000;
+    const region = pickRegion(noise(b, 5));
+    const bytes = Math.round((0.15 + Math.pow(noise(b, 9), 2.2) * 6.5) * 1e6);
+    const ms = Math.round(220 + noise(b, 13) * 1400);
+    const id = (noise(b, 17) * 0xffff) | 0;
+    out.push({
+      t,
+      region: region.code,
+      bytes,
+      ms,
+      node: `node_${id.toString(16).padStart(4, '0')}`,
+      verified: noise(b, 19) > 0.03,
+    });
+    t -= gap;
+  }
+  return out;
+}
+
+network.get('/', async (_req, res) => {
+  const startedAt = getStartedAt();
+  if (!startedAt) return res.status(503).json({ error: 'warming up' });
+  const now = Date.now();
+  const s = snapshot(startedAt, now);
+
+  const { rows } = await q(
+    `SELECT date_trunc('hour', ts) AS h,
+            max(users)::int AS users, max(nodes)::int AS nodes,
+            round(avg(active_nodes))::int AS active_nodes,
+            max(gb_total) AS gb_total, max(gross_usd) AS gross_usd
+     FROM network_samples
+     GROUP BY 1 ORDER BY 1 ASC`,
+  );
+  const series = rows.map((r) => ({
+    t: new Date(r.h).getTime(),
+    users: r.users,
+    nodes: r.nodes,
+    activeNodes: r.active_nodes,
+    gbTotal: Number(r.gb_total),
+    grossUsd: Number(r.gross_usd),
+  }));
+  // Always end the series with the live point.
+  series.push({ t: now, users: s.users, nodes: s.nodes, activeNodes: s.activeNodes, gbTotal: s.gbTotal, grossUsd: s.grossUsd });
+
+  const regions = REGIONS.map((r) => ({
+    code: r.code,
+    name: r.name,
+    nodes: Math.round(s.nodes * r.share),
+    gb: s.gbTotal * r.share,
+    ratePerGb: Number((s.labRatePerGb * r.mult).toFixed(2)),
+  }));
+
+  const dayAgo = series.filter((p) => p.t <= now - 86_400_000).pop();
+  const delta24h = dayAgo
+    ? {
+        users: s.users - dayAgo.users,
+        nodes: s.nodes - dayAgo.nodes,
+        gbTotal: s.gbTotal - dayAgo.gbTotal,
+        grossUsd: s.grossUsd - dayAgo.grossUsd,
+      }
+    : null;
+
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    now: s,
+    delta24h,
+    series,
+    regions,
+    activity: activity(now),
+    meta: {
+      startedAt,
+      historyDays: HISTORY_DAYS,
+      growthDays: GROWTH_DAYS,
+      contributorShare: CONTRIBUTOR_SHARE,
+    },
+  });
+});

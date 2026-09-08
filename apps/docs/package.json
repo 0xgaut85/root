@@ -1,0 +1,15 @@
+{
+  "name": "@rootnetwork/docs",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vitepress dev --host --port 5174",
+    "build": "vitepress build",
+    "preview": "vitepress preview --host --port 4174",
+    "start": "node server.mjs"
+  },
+  "devDependencies": {
+    "vitepress": "^1.6.4"
+  }
+}
