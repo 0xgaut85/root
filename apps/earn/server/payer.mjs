@@ -424,7 +424,10 @@ async function recycle() {
         const id = await recordRecycle({ railId, wallet: node.address, kind: 'gas', amountRaw: topup, usd: null, hash });
         console.log(`[recycle] gas ${formatEther(topup)} ETH on ${r.chain} -> ${node.address} ${hash}`);
         if (!(await waitRecycle(railId, id, hash))) await retry('gas top-up unconfirmed');
-        return true; // still due: the next call forwards node -> hop1
+        // Come back in two minutes: a lagging RPC replica can still report the old balance right
+        // after the receipt, which would trigger a second, pointless top-up.
+        else await q(`UPDATE recycle_jobs SET due_at = now() + interval '2 minutes', updated_at = now() WHERE id = $1`, [job.id]);
+        return true;
       }
       // Fresh hop wallets, unless a previous attempt already minted them (keep the keys we stored).
       let hop1Addr = job.hop1_addr;
