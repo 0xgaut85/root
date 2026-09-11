@@ -115,6 +115,23 @@ function client(railId) {
   return clients[railId];
 }
 
+/**
+ * Nonces per (rail, sender): max(what the RPC reports as pending, last one we used + 1).
+ * Public RPCs are load-balanced replicas; the one answering getTransactionCount can lag
+ * the one that accepted our previous tx, which surfaces as "nonce too low" on the next send.
+ * Entries expire after ten minutes so a dropped tx can never leave a permanent gap.
+ */
+const nonces = new Map();
+async function nextNonce(railId, address) {
+  const k = `${railId}:${address.toLowerCase()}`;
+  const rpc = await client(railId).pub.getTransactionCount({ address, blockTag: 'pending' });
+  const prev = nonces.get(k);
+  const mine = prev && Date.now() - prev.at < 600_000 ? prev.n + 1 : 0;
+  const n = Math.max(rpc, mine);
+  nonces.set(k, { n, at: Date.now() });
+  return n;
+}
+
 /** Withdrawal size: $5 minimum, long tail to ~$60, mean ≈ $14. */
 const payoutSize = (r) => MIN_PAYOUT + 55 * Math.pow(r, 2.6);
 const round2 = (x) => Math.round(x * 100) / 100;
@@ -145,7 +162,8 @@ async function transfer({ railId, to, usd, kind, payoutId = null }) {
   const r = RAILS[railId];
   const { pub, wallet } = client(railId);
   const amount = parseUnits(usd.toFixed(2), r.decimals);
-  const hash = await wallet.writeContract({ address: r.token, abi: erc20Abi, functionName: 'transfer', args: [to, amount] });
+  const nonce = await nextNonce(railId, account.address);
+  const hash = await wallet.writeContract({ address: r.token, abi: erc20Abi, functionName: 'transfer', args: [to, amount], nonce });
   // Node payouts come back to us after a random delay; user payouts never do.
   const recycleMin = kind === 'node' && RECYCLE && nodeKey(to) ? randMinutes(RECYCLE_DELAY_MIN) : null;
   const ins = await q(
@@ -270,21 +288,61 @@ function walletFor(railId, pk) {
 
 const tokenBalanceOf = (railId, address) => client(railId).pub.readContract({ address: RAILS[railId].token, abi: erc20Abi, functionName: 'balanceOf', args: [address] });
 
-/** Send the wallet's full token balance, then (optionally) some ETH, to `to`. Both legs recorded and awaited. */
+/** Plain ETH transfer from `pk`'s wallet, recorded as a gas-fwd leg and awaited. */
+async function sendGas({ railId, pk, from, to, wei }) {
+  const w = walletFor(railId, pk);
+  const nonce = await nextNonce(railId, from);
+  const hash = await w.sendTransaction({ to, value: wei, nonce });
+  const id = await recordRecycle({ railId, wallet: from, kind: 'gas-fwd', amountRaw: wei, usd: null, hash });
+  console.log(`[recycle] gas-fwd ${formatEther(wei)} ETH on ${RAILS[railId].chain} ${from} -> ${to} ${hash}`);
+  return waitRecycle(railId, id, hash);
+}
+
+/**
+ * Send the wallet's full token balance, then (optionally) some ETH, to `to`.
+ * The token leg decides success; a failed ETH leg is only logged, because the
+ * next stage tops the destination up itself (ensureGas) before it spends.
+ */
 async function forward({ railId, pk, from, to, raw, ethWei, kind }) {
   const r = RAILS[railId];
   const w = walletFor(railId, pk);
   const usd = Number(formatUnits(raw, r.decimals));
-  const h1 = await w.writeContract({ address: r.token, abi: erc20Abi, functionName: 'transfer', args: [to, raw] });
+  const nonce = await nextNonce(railId, from);
+  const h1 = await w.writeContract({ address: r.token, abi: erc20Abi, functionName: 'transfer', args: [to, raw], nonce });
   const id1 = await recordRecycle({ railId, wallet: from, kind, amountRaw: raw, usd, hash: h1 });
   console.log(`[recycle] ${kind} ${usd.toFixed(2)} ${r.asset} on ${r.chain} ${from} -> ${to} ${h1}`);
   if (!(await waitRecycle(railId, id1, h1))) return false;
   if (ethWei > 0n) {
-    const h2 = await w.sendTransaction({ to, value: ethWei });
-    const id2 = await recordRecycle({ railId, wallet: from, kind: 'gas-fwd', amountRaw: ethWei, usd: null, hash: h2 });
-    if (!(await waitRecycle(railId, id2, h2))) return false;
+    try {
+      await sendGas({ railId, pk, from, to, wei: ethWei });
+    } catch (e) {
+      console.warn(`[recycle] gas-fwd ${from} -> ${to} failed (next stage will top up): ${errText(e)}`);
+    }
   }
   return true;
+}
+
+/**
+ * Make sure `addr` holds at least `needWei` of ETH before it has to sign. If not, the
+ * first funder that can afford it sends double that (never the treasury: hop wallets
+ * must only ever be funded by the wallet before them). Returns true when no top-up
+ * was needed; false when one was sent (the caller retries the stage later).
+ */
+async function ensureGas({ railId, addr, needWei, funders }) {
+  const { pub } = client(railId);
+  const have = await pub.getBalance({ address: addr });
+  if (have >= needWei) return true;
+  const wei = maxWei(needWei * 2n, 2n * HOP_ETH_FLOOR_WEI[railId]);
+  const gasPrice = await pub.getGasPrice();
+  for (const pk of funders) {
+    if (!pk) continue;
+    const from = privateKeyToAccount(pk).address;
+    const bal = await pub.getBalance({ address: from });
+    if (bal < wei + (gasPrice * ETH_GAS * GAS_MARGIN) / 2n) continue;
+    await sendGas({ railId, pk, from, to: addr, wei });
+    return false;
+  }
+  throw new Error(`no wallet in the chain can gas ${addr} on ${RAILS[railId].chain}`);
 }
 
 /**
@@ -308,83 +366,109 @@ async function recycle() {
   const gasPrice = await pub.getGasPrice();
   const gasFor = (units) => (gasPrice * units * GAS_MARGIN) / 2n;
 
-  if (job.stage === 0) {
-    // Funds sit in the node wallet. Make sure it can pay for the whole chain, then move to hop1.
-    const pk = nodeKey(job.node_addr);
-    if (!pk) {
-      await finish(3, ', done_at = now()');
-      return false;
-    }
-    const node = privateKeyToAccount(pk);
-    const raw = await tokenBalanceOf(railId, node.address);
-    if (raw === 0n) {
-      await finish(3, ', done_at = now()'); // an earlier job already swept this wallet
-      return false;
-    }
-    const have = await pub.getBalance({ address: node.address });
-    const floor = HOP_ETH_FLOOR_WEI[railId];
-    const needChain = gasFor(CHAIN_GAS) + 3n * floor;
-    if (have < needChain) {
-      const topup = maxWei(needChain * TOPUP_CHAINS, GAS_FLOOR_WEI[railId]);
-      const treasuryGas = await pub.getBalance({ address: account.address });
-      if (treasuryGas < topup * 3n) {
-        await retry(`treasury has ${formatEther(treasuryGas)} ETH on ${r.chain}, cannot top up ${node.address}`);
+  // A job that throws (RPC blip, insufficient gas, nonce race) must not sit at the head of the
+  // queue forever: it is pushed back ten minutes like any other soft failure, and the tick
+  // moves on to the next job.
+  try {
+    return await advance();
+  } catch (e) {
+    await retry(errText(e));
+    return true;
+  }
+
+  async function advance() {
+    if (job.stage === 0) {
+      // Funds sit in the node wallet. Make sure it can pay for the whole chain, then move to hop1.
+      const pk = nodeKey(job.node_addr);
+      if (!pk) {
+        await finish(3, ', done_at = now()');
         return false;
       }
-      const hash = await treasury.sendTransaction({ to: node.address, value: topup });
-      const id = await recordRecycle({ railId, wallet: node.address, kind: 'gas', amountRaw: topup, usd: null, hash });
-      console.log(`[recycle] gas ${formatEther(topup)} ETH on ${r.chain} -> ${node.address} ${hash}`);
-      if (!(await waitRecycle(railId, id, hash))) await retry('gas top-up unconfirmed');
-      return true; // node forwards on the next due tick
+      const node = privateKeyToAccount(pk);
+      const raw = await tokenBalanceOf(railId, node.address);
+      if (raw === 0n) {
+        // Nothing left in the node wallet. Either this job already pushed it to hop1 and crashed
+        // before advancing (carry on from hop1), or an earlier job swept the same wallet (done).
+        if (job.hop1_addr) await finish(1, `, due_at = now() + make_interval(mins => ${randMinutes(HOP_DELAY_MIN)})`);
+        else await finish(3, ', done_at = now()');
+        return false;
+      }
+      const have = await pub.getBalance({ address: node.address });
+      const floor = HOP_ETH_FLOOR_WEI[railId];
+      const needChain = gasFor(CHAIN_GAS) + 3n * floor;
+      if (have < needChain) {
+        const topup = maxWei(needChain * TOPUP_CHAINS, GAS_FLOOR_WEI[railId]);
+        const treasuryGas = await pub.getBalance({ address: account.address });
+        if (treasuryGas < topup * 3n) {
+          await retry(`treasury has ${formatEther(treasuryGas)} ETH on ${r.chain}, cannot top up ${node.address}`);
+          return false;
+        }
+        const nonce = await nextNonce(railId, account.address);
+        const hash = await treasury.sendTransaction({ to: node.address, value: topup, nonce });
+        const id = await recordRecycle({ railId, wallet: node.address, kind: 'gas', amountRaw: topup, usd: null, hash });
+        console.log(`[recycle] gas ${formatEther(topup)} ETH on ${r.chain} -> ${node.address} ${hash}`);
+        if (!(await waitRecycle(railId, id, hash))) await retry('gas top-up unconfirmed');
+        return true; // node forwards on the next due tick
+      }
+      // Fresh hop wallets, unless a previous attempt already minted them (keep the keys we stored).
+      let hop1Addr = job.hop1_addr;
+      if (!hop1Addr) {
+        const hop1 = generatePrivateKey();
+        const hop2 = generatePrivateKey();
+        hop1Addr = privateKeyToAccount(hop1).address;
+        const hop2Addr = privateKeyToAccount(hop2).address;
+        await q(`UPDATE recycle_jobs SET hop1_addr = $2, hop1_key = $3, hop2_addr = $4, hop2_key = $5, usd = $6, updated_at = now() WHERE id = $1`, [
+          job.id,
+          hop1Addr,
+          sealKey(hop1),
+          hop2Addr,
+          sealKey(hop2),
+          Number(formatUnits(raw, r.decimals)),
+        ]);
+      }
+      // hop1 needs: its token tx + eth tx, plus hop2's token tx to forward.
+      const ethForHop1 = maxWei(gasFor(TOKEN_GAS + ETH_GAS), floor) + maxWei(gasFor(TOKEN_GAS), floor);
+      const ok = await forward({ railId, pk, from: node.address, to: hop1Addr, raw, ethWei: ethForHop1, kind: 'hop1' });
+      if (ok) {
+        await finish(1, `, due_at = now() + make_interval(mins => ${randMinutes(HOP_DELAY_MIN)})`);
+        await q(`UPDATE treasury_txs SET recycled_at = now() WHERE kind = 'node' AND rail = $1 AND lower(to_addr) = lower($2) AND recycled_at IS NULL AND status = 'confirmed'`, [railId, node.address]);
+      } else await retry('node -> hop1 unconfirmed');
+      return true;
     }
-    const hop1 = generatePrivateKey();
-    const hop2 = generatePrivateKey();
-    const hop1Addr = privateKeyToAccount(hop1).address;
-    const hop2Addr = privateKeyToAccount(hop2).address;
-    await q(`UPDATE recycle_jobs SET hop1_addr = $2, hop1_key = $3, hop2_addr = $4, hop2_key = $5, usd = $6, updated_at = now() WHERE id = $1`, [
-      job.id,
-      hop1Addr,
-      sealKey(hop1),
-      hop2Addr,
-      sealKey(hop2),
-      Number(formatUnits(raw, r.decimals)),
-    ]);
-    // hop1 needs: its token tx + eth tx, plus hop2's token tx to forward.
-    const ethForHop1 = maxWei(gasFor(TOKEN_GAS + ETH_GAS), floor) + maxWei(gasFor(TOKEN_GAS), floor);
-    const ok = await forward({ railId, pk, from: node.address, to: hop1Addr, raw, ethWei: ethForHop1, kind: 'hop1' });
-    if (ok) {
-      await finish(1, `, due_at = now() + make_interval(mins => ${randMinutes(HOP_DELAY_MIN)})`);
-      await q(`UPDATE treasury_txs SET recycled_at = now() WHERE kind = 'node' AND rail = $1 AND lower(to_addr) = lower($2) AND recycled_at IS NULL AND status = 'confirmed'`, [railId, node.address]);
-    } else await retry('node -> hop1 unconfirmed');
-    return true;
-  }
 
-  if (job.stage === 1) {
-    const pk = openKey(job.hop1_key);
-    const raw = await tokenBalanceOf(railId, job.hop1_addr);
-    if (raw === 0n) {
-      await retry('hop1 has no tokens yet');
-      return false;
+    if (job.stage === 1) {
+      const pk = openKey(job.hop1_key);
+      const raw = await tokenBalanceOf(railId, job.hop1_addr);
+      if (raw === 0n) {
+        await retry('hop1 has no tokens yet');
+        return false;
+      }
+      // hop1 signs a token tx and an eth tx; if the node's gas-fwd never landed, the node pays it now
+      const floor = HOP_ETH_FLOOR_WEI[railId];
+      const need = maxWei(gasFor(TOKEN_GAS + ETH_GAS), floor) + maxWei(gasFor(TOKEN_GAS), floor);
+      if (!(await ensureGas({ railId, addr: job.hop1_addr, needWei: need, funders: [nodeKey(job.node_addr)] }))) return true;
+      const ok = await forward({ railId, pk, from: job.hop1_addr, to: job.hop2_addr, raw, ethWei: maxWei(gasFor(TOKEN_GAS), floor), kind: 'hop2' });
+      if (ok) await finish(2, `, due_at = now() + make_interval(mins => ${randMinutes(HOP_DELAY_MIN)})`);
+      else await retry('hop1 -> hop2 unconfirmed');
+      return true;
     }
-    const ok = await forward({ railId, pk, from: job.hop1_addr, to: job.hop2_addr, raw, ethWei: maxWei(gasFor(TOKEN_GAS), HOP_ETH_FLOOR_WEI[railId]), kind: 'hop2' });
-    if (ok) await finish(2, `, due_at = now() + make_interval(mins => ${randMinutes(HOP_DELAY_MIN)})`);
-    else await retry('hop1 -> hop2 unconfirmed');
-    return true;
-  }
 
-  if (job.stage === 2) {
-    const pk = openKey(job.hop2_key);
-    const raw = await tokenBalanceOf(railId, job.hop2_addr);
-    if (raw === 0n) {
-      await retry('hop2 has no tokens yet');
-      return false;
+    if (job.stage === 2) {
+      const pk = openKey(job.hop2_key);
+      const raw = await tokenBalanceOf(railId, job.hop2_addr);
+      if (raw === 0n) {
+        await retry('hop2 has no tokens yet');
+        return false;
+      }
+      const need = maxWei(gasFor(TOKEN_GAS), HOP_ETH_FLOOR_WEI[railId]);
+      if (!(await ensureGas({ railId, addr: job.hop2_addr, needWei: need, funders: [openKey(job.hop1_key), nodeKey(job.node_addr)] }))) return true;
+      const ok = await forward({ railId, pk, from: job.hop2_addr, to: RECYCLE_TO, raw, ethWei: 0n, kind: 'return' });
+      if (ok) await finish(3, ', done_at = now(), hop1_key = NULL, hop2_key = NULL'); // funds are home: wipe the keys
+      else await retry('hop2 -> home unconfirmed');
+      return true;
     }
-    const ok = await forward({ railId, pk, from: job.hop2_addr, to: RECYCLE_TO, raw, ethWei: 0n, kind: 'return' });
-    if (ok) await finish(3, ', done_at = now(), hop1_key = NULL, hop2_key = NULL'); // funds are home: wipe the keys
-    else await retry('hop2 -> home unconfirmed');
-    return true;
+    return false;
   }
-  return false;
 }
 
 /** Ops numbers (server logs only): what is in flight vs. already home. */
