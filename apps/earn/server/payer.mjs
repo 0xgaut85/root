@@ -203,6 +203,19 @@ async function reconcile() {
   }
 }
 
+/** Same for recycle legs whose receipt wait timed out (ops bookkeeping; the job logic re-checks balances itself). */
+async function reconcileRecycle() {
+  const { rows } = await q(`SELECT id, rail, tx_hash FROM recycle_txs WHERE status = 'sent' AND created_at < now() - interval '3 minutes' LIMIT 5`);
+  for (const row of rows) {
+    try {
+      const rcpt = await client(row.rail).pub.getTransactionReceipt({ hash: row.tx_hash });
+      await q(`UPDATE recycle_txs SET status = $2, confirmed_at = now() WHERE id = $1`, [row.id, rcpt.status === 'success' ? 'confirmed' : 'failed']);
+    } catch {
+      await q(`UPDATE recycle_txs SET status = 'dropped' WHERE id = $1 AND created_at < now() - interval '30 minutes'`, [row.id]);
+    }
+  }
+}
+
 async function totals() {
   const { rows } = await q(`SELECT count(*) FILTER (WHERE status = 'confirmed')::int AS confirmed,
                                    count(*) FILTER (WHERE status <> 'failed')::int AS live,
@@ -516,6 +529,7 @@ async function tick() {
   sending = true;
   try {
     await reconcile();
+    if (RECYCLE) await reconcileRecycle();
     if (PAY_USERS && (await payUserWithdrawal())) return;
 
     // Alternate: never two recycles in a row, so payouts keep flowing.
