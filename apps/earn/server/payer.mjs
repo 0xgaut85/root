@@ -83,8 +83,11 @@ const robinhood = defineChain({
   nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
   rpcUrls: { default: { http: [RAILS['robinhood-usdg'].rpc] } },
   blockExplorers: { default: { name: 'Blockscout', url: RAILS['robinhood-usdg'].explorer } },
+  fees: { baseFeeMultiplier: 2 },
 });
-const CHAINS = { 'base-usdc': base, 'robinhood-usdg': robinhood };
+// Both L2s move their base fee between our estimate and the block that includes the tx; a
+// higher fee cap only raises what we are *willing* to pay, not what we pay (base + tip).
+const CHAINS = { 'base-usdc': { ...base, fees: { ...base.fees, baseFeeMultiplier: 2 } }, 'robinhood-usdg': robinhood };
 
 export let payerEnabled = false;
 let account = null;
