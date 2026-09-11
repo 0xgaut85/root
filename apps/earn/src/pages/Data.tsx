@@ -72,7 +72,7 @@ export function Data() {
               <div className="row__main">
                 <div className="row__t">To contributors</div>
                 <div className="row__s" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                  80% of every dollar
+                  70% of every dollar
                 </div>
               </div>
               <div className="row__r" style={{ color: '#fff', fontWeight: 500 }}>
@@ -83,7 +83,7 @@ export function Data() {
               <div className="row__main">
                 <div className="row__t">Network fee</div>
                 <div className="row__s" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                  20% · routers, validators, payouts
+                  30% · routers, validators, payouts
                 </div>
               </div>
               <div className="row__r" style={{ color: '#fff', fontWeight: 500 }}>
@@ -205,7 +205,7 @@ export function Data() {
                       <div className="row__s">on {r.chain}</div>
                     </div>
                   </div>
-                  <div className="row__r">{data ? `${Math.round((data.rails.find((x) => x.id === id)?.share ?? 0) * 100)}%` : ''}</div>
+                  <div className="row__r" style={{ color: 'var(--ink-3)', fontSize: 12 }}>{data?.rails.find((x) => x.id === id)?.chainId ? `chain ${data.rails.find((x) => x.id === id)!.chainId}` : ''}</div>
                 </div>
               );
             })}

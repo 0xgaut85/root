@@ -812,12 +812,12 @@ body {
   }
 }
 .rn-split__a {
-  flex: 0 0 80%;
+  flex: 0 0 70%;
   background: #fff;
   color: #000;
 }
 .rn-split__b {
-  flex: 0 0 20%;
+  flex: 0 0 30%;
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
 }

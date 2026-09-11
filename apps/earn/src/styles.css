@@ -931,7 +931,7 @@ a.feed__row--pay:hover .feed__node {
 }
 .map__legend {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
 }
 .map__leg {

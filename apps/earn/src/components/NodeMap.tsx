@@ -95,8 +95,6 @@ type Props = {
   nodes: number;
 };
 
-type Pulse = { x: number; y: number; t0: number; ok: boolean };
-
 export function NodeMap({ regions, continents, activeNodes, nodes: nodeCount }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -178,8 +176,7 @@ export function NodeMap({ regions, continents, activeNodes, nodes: nodeCount }: 
     });
   }, [mapNodes, projection]);
 
-  // Draw loop with pulses.
-  const pulsesRef = useRef<Pulse[]>([]);
+  // Draw loop: static dots (no pulses), hover ring only.
   const hoverRef = useRef(hover);
   hoverRef.current = hover;
   const focusRef = useRef<Continent | null>(null);
@@ -193,21 +190,8 @@ export function NodeMap({ regions, continents, activeNodes, nodes: nodeCount }: 
     canvas.height = size.h * dpr;
     const ctx = canvas.getContext('2d')!;
     let raf = 0;
-    let lastPulse = 0;
-    const online = projected.filter((p) => p.n.online);
 
-    const draw = (now: number) => {
-      // Spawn a delivery pulse every 350–900 ms on a random online node.
-      if (online.length && now - lastPulse > 350 + Math.random() * 550) {
-        lastPulse = now;
-        const pool = focusRef.current ? online.filter((p) => p.n.continent === focusRef.current) : online;
-        if (pool.length) {
-          const p = pool[Math.floor(Math.random() * pool.length)];
-          pulsesRef.current.push({ x: p.x, y: p.y, t0: now, ok: Math.random() > 0.04 });
-        }
-      }
-      pulsesRef.current = pulsesRef.current.filter((p) => now - p.t0 < 1400);
-
+    const draw = () => {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(landLayer, 0, 0);
@@ -228,15 +212,6 @@ export function NodeMap({ regions, continents, activeNodes, nodes: nodeCount }: 
         }
       }
       ctx.globalAlpha = 1;
-
-      for (const p of pulsesRef.current) {
-        const k = (now - p.t0) / 1400;
-        ctx.strokeStyle = p.ok ? `rgba(34,197,94,${(1 - k) * 0.9})` : `rgba(229,72,77,${(1 - k) * 0.9})`;
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, rDot + k * 16, 0, Math.PI * 2);
-        ctx.stroke();
-      }
 
       const h = hoverRef.current;
       if (h) {

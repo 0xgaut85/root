@@ -13,8 +13,9 @@
  *  - Steady state: cumulative payouts follow WITHDRAW_SHARE of what contributors
  *    have earned on the public curve (people leave ~30% in their balance). At
  *    most one transfer per tick, so a long downtime never turns into a burst.
- *  - Rail split: RAILS[*].share (80% Base / 20% Robinhood Chain), falling back
- *    to the other rail when one is short of funds.
+ *  - Rail split: each payout draws its rail with probability RAILS[*].share
+ *    (≈70% Robinhood Chain / 30% Base, so the realised mix wanders around
+ *    that), falling back to the other rail when one is short of funds.
  *
  * Contributor withdrawals from the dashboard (`payouts` table) are NOT sent
  * automatically unless PAY_USER_WITHDRAWALS=1: contributor balances come from

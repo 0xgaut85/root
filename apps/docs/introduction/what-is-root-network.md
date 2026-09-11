@@ -14,7 +14,7 @@ Root Network is our answer: connect the two sides directly, verify every byte, a
 
 **Paid in dollars, not points.** Your dashboard shows earnings in USD from the first hour. There is no points system to decode, no token to wait for, and no conversion rate that changes under you.
 
-**Transparent take rate.** AI labs pay the network for bandwidth. Contributors receive 80% of what labs pay. Root Network keeps 20% to run routers, validators, support and compliance. That is the whole business model, and you can read it in [How Root Network makes money](/economics/how-we-make-money).
+**Transparent take rate.** AI labs pay the network for bandwidth. Contributors receive 70% of what labs pay. Root Network keeps 30% to run routers, validators, support and compliance. That is the whole business model, and you can read it in [How Root Network makes money](/economics/how-we-make-money).
 
 **You set the limits.** The extension lets you allocate a percentage of your connection to the network and change it at any time. Pausing is instant. The network never uses more than you allowed.
 

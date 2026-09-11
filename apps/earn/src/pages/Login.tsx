@@ -25,7 +25,7 @@ export function Login() {
             <br />
             internet <em>to work.</em>
           </h1>
-          <p>Share the bandwidth you don't use with AI research. Set a percentage, keep your data, and get paid in dollars. Contributors receive 80% of what labs pay.</p>
+          <p>Share the bandwidth you don't use with AI research. Set a percentage, keep your data, and get paid in dollars. Contributors receive 70% of what labs pay.</p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <button className="btn btn--primary btn--lg" onClick={login} disabled={!ready}>
               {ready ? 'Sign in or create account' : 'Loading…'}

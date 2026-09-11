@@ -17,7 +17,7 @@ You do not need to do anything to be selected. Stay online, keep an allocation t
 
 For each settlement window:
 
-1. Every lab payment for that window is pooled. **80%** of the pool is set aside for contributors; 20% goes to Root Network.
+1. Every lab payment for that window is pooled. **70%** of the pool is set aside for contributors; 30% goes to Root Network.
 2. Each delivery in the window is weighted: `weight = bytes × region_multiplier × reliability_multiplier`.
 3. Your payout is your share of the total weight, applied to the contributor pool.
 
@@ -27,7 +27,7 @@ For each settlement window:
 
 ### Example
 
-Suppose labs paid **$12,000** for a window in which the network delivered **9,600 GB**. The contributor pool is $9,600, or **$1.00 per weighted GB**. Your node delivered 4.2 GB from a 1.1× region with a 1.15× reliability score, so your weight is 5.31 GB and you earn **$5.31** for that window.
+Suppose labs paid **$12,000** for a window in which the network delivered **9,600 GB**. The contributor pool is $8,400, or **$0.875 per weighted GB**. Your node delivered 3.2 GB from a 1.1× region with a 1.15× reliability score, so your weight is 4.05 GB and you earn **$3.54** for that window.
 
 ## Live estimate vs. settled
 

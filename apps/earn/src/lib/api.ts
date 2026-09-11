@@ -13,12 +13,12 @@ export type NetworkSnapshot = {
   progress: number;
 };
 export type NetworkPoint = { t: number; users: number; nodes: number; activeNodes: number; gbTotal: number; grossUsd: number };
-export type Continent = 'americas' | 'europe' | 'asia' | 'africa';
+export type Continent = 'north-america' | 'south-america' | 'europe' | 'asia' | 'africa';
 export type NetworkRegion = { code: string; name: string; continent: Continent; share: number; nodes: number; gb: number; ratePerGb: number };
 export type NetworkContinent = { id: Continent; name: string; share: number; nodes: number };
 export type NetworkActivity = { t: number; region: string; bytes: number; ms: number; node: string; verified: boolean };
 export type RailId = 'base-usdc' | 'robinhood-usdg';
-export type Rail = { id: RailId; asset: string; assetName: string; chain: string; chainId: number; explorer: string; token: string; share: number };
+export type Rail = { id: RailId; asset: string; assetName: string; chain: string; chainId: number; explorer: string; token: string };
 export type TreasuryPayout = { t: number; to: string; usd: number; rail: RailId; txHash: string; status: 'sent' | 'confirmed' };
 export type ExtensionInfo = { id: string; version: string; storeUrl: string; browsers: string[] };
 export type AppConfig = { privyAppId: string | null; devAuth: boolean; publicUrl: string | null; treasury: string; rails: Rail[]; extension: ExtensionInfo };

@@ -25,7 +25,7 @@ Sign in at [earn.rootnetwork.co](https://earn.rootnetwork.co), add the extension
 :::
 
 <div class="rn-stats">
-<div class="rn-stat"><span class="rn-stat__v">80%</span><span class="rn-stat__l">of lab spend goes to contributors</span></div>
+<div class="rn-stat"><span class="rn-stat__v">70%</span><span class="rn-stat__l">of lab spend goes to contributors</span></div>
 <div class="rn-stat"><span class="rn-stat__v">0</span><span class="rn-stat__l">access to your browsing or data</span></div>
 <div class="rn-stat"><span class="rn-stat__v">1 tap</span><span class="rn-stat__l">to pause, resize or stop</span></div>
 </div>
@@ -36,7 +36,7 @@ Sign in at [earn.rootnetwork.co](https://earn.rootnetwork.co), add the extension
 <a class="rn-card" href="/introduction/what-is-root-network"><span class="rn-card__k">Introduction</span><span class="rn-card__t">What is Root Network</span><span class="rn-card__d">Why idle home bandwidth matters to AI research, and what we do differently.</span></a>
 <a class="rn-card" href="/guide/set-up"><span class="rn-card__k">Guide</span><span class="rn-card__t">Set up in three steps</span><span class="rn-card__d">Sign in, install the extension, choose your allocation. That's it.</span></a>
 <a class="rn-card" href="/architecture/overview"><span class="rn-card__k">Architecture</span><span class="rn-card__t">How the network is built</span><span class="rn-card__d">Nodes, routers, validators and the proofs that tie them together.</span></a>
-<a class="rn-card" href="/economics/how-we-make-money"><span class="rn-card__k">Economics</span><span class="rn-card__t">How Root Network makes money</span><span class="rn-card__d">Labs pay for bandwidth. Contributors keep 80%. We keep 20%. No token.</span></a>
+<a class="rn-card" href="/economics/how-we-make-money"><span class="rn-card__k">Economics</span><span class="rn-card__t">How Root Network makes money</span><span class="rn-card__d">Labs pay for bandwidth. Contributors keep 70%. We keep 30%. No token.</span></a>
 </div>
 
 ## Community

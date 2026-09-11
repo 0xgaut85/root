@@ -16,8 +16,8 @@
  * referrals compound). Revenue is not an independent curve: it is the integral
  * of contributors × a constant revenue per contributor-day (ARPU). ARPU is
  * solved so that gross passes through $11,000 at the ceiling; at $1.25/GB that
- * is ≈2.6 GB per contributor per day, i.e. ≈$2.6/day to a contributor, which is
- * what the docs and FAQ quote. Every derived figure is therefore coherent by
+ * is ≈2.5 GB per contributor per day, i.e. ≈$2.2/day to a contributor at the
+ * 70% share, which is what the docs and FAQ quote. Every derived figure is therefore coherent by
  * construction: daily revenue, GB/day and live throughput are all proportional
  * to how many contributors exist at that moment.
  *
@@ -39,9 +39,9 @@ export const GROSS = { start: 260, ceiling: 11_000 };
 /** Shape of the contributor curve: >1 = slow start that accelerates. */
 const USERS_EXP = 1.35;
 
-/** Labs pay per GB (blended). Contributors receive 80% of it. */
+/** Labs pay per GB (blended). Contributors receive 70% of it; the network keeps a flat 30% fee. */
 export const LAB_RATE_PER_GB = 1.25;
-export const CONTRIBUTOR_SHARE = 0.8;
+export const CONTRIBUTOR_SHARE = 0.7;
 export const CONTRIBUTOR_RATE_PER_GB = LAB_RATE_PER_GB * CONTRIBUTOR_SHARE;
 
 /** Devices per user and the share of them online at a given hour. */
@@ -174,26 +174,28 @@ export function snapshot(startedAtMs, nowMs = Date.now()) {
 
 /**
  * Country mix used by the Data page and the node map. Shares sum to 1 and roll
- * up to the continent targets: Americas 50%, Europe 30%, Asia-Pacific 15%,
- * Africa 5%. `mult` is the lab rate for that country relative to the blended
- * rate (harder-to-reach regions bill higher).
+ * up to the continent targets: North America 40%, South America 10%, Europe 30%,
+ * Asia-Pacific 15%, Africa 5%. `mult` is the lab rate for that country relative
+ * to the blended rate (harder-to-reach regions bill higher).
  */
 export const CONTINENTS = [
-  { id: 'americas', name: 'Americas', share: 0.5 },
+  { id: 'north-america', name: 'North America', share: 0.4 },
+  { id: 'south-america', name: 'South America', share: 0.1 },
   { id: 'europe', name: 'Europe', share: 0.3 },
   { id: 'asia', name: 'Asia-Pacific', share: 0.15 },
   { id: 'africa', name: 'Africa', share: 0.05 },
 ];
 
 export const REGIONS = [
-  // Americas · 50
-  { code: 'US', name: 'United States', continent: 'americas', share: 0.31, mult: 1.0 },
-  { code: 'BR', name: 'Brazil', continent: 'americas', share: 0.07, mult: 1.3 },
-  { code: 'CA', name: 'Canada', continent: 'americas', share: 0.05, mult: 1.0 },
-  { code: 'MX', name: 'Mexico', continent: 'americas', share: 0.03, mult: 1.2 },
-  { code: 'AR', name: 'Argentina', continent: 'americas', share: 0.02, mult: 1.3 },
-  { code: 'CO', name: 'Colombia', continent: 'americas', share: 0.01, mult: 1.3 },
-  { code: 'CL', name: 'Chile', continent: 'americas', share: 0.01, mult: 1.3 },
+  // North America · 40
+  { code: 'US', name: 'United States', continent: 'north-america', share: 0.32, mult: 1.0 },
+  { code: 'CA', name: 'Canada', continent: 'north-america', share: 0.05, mult: 1.0 },
+  { code: 'MX', name: 'Mexico', continent: 'north-america', share: 0.03, mult: 1.2 },
+  // South America · 10
+  { code: 'BR', name: 'Brazil', continent: 'south-america', share: 0.06, mult: 1.3 },
+  { code: 'AR', name: 'Argentina', continent: 'south-america', share: 0.02, mult: 1.3 },
+  { code: 'CO', name: 'Colombia', continent: 'south-america', share: 0.01, mult: 1.3 },
+  { code: 'CL', name: 'Chile', continent: 'south-america', share: 0.01, mult: 1.3 },
   // Europe · 30
   { code: 'DE', name: 'Germany', continent: 'europe', share: 0.07, mult: 1.1 },
   { code: 'GB', name: 'United Kingdom', continent: 'europe', share: 0.06, mult: 1.1 },
@@ -212,10 +214,10 @@ export const REGIONS = [
   { code: 'ID', name: 'Indonesia', continent: 'asia', share: 0.01, mult: 1.2 },
   { code: 'VN', name: 'Vietnam', continent: 'asia', share: 0.01, mult: 1.2 },
   { code: 'AU', name: 'Australia', continent: 'asia', share: 0.01, mult: 1.3 },
-  // Africa · 5
-  { code: 'NG', name: 'Nigeria', continent: 'africa', share: 0.02, mult: 1.5 },
-  { code: 'ZA', name: 'South Africa', continent: 'africa', share: 0.02, mult: 1.4 },
-  { code: 'KE', name: 'Kenya', continent: 'africa', share: 0.01, mult: 1.5 },
+  // Africa · 5 (Nigeria carries 80% of it)
+  { code: 'NG', name: 'Nigeria', continent: 'africa', share: 0.04, mult: 1.5 },
+  { code: 'ZA', name: 'South Africa', continent: 'africa', share: 0.005, mult: 1.4 },
+  { code: 'KE', name: 'Kenya', continent: 'africa', share: 0.005, mult: 1.5 },
 ];
 
 /**

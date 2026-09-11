@@ -9,6 +9,7 @@ import { snapshot } from '../growth.mjs';
 export const ext = Router();
 
 const PROBE = randomBytes(2 * 1024 * 1024);
+const MAX_DEVICES_PER_USER = Number(process.env.MAX_DEVICES_PER_USER) || 5;
 
 /** 2 MB of incompressible bytes for the extension's capacity probe. */
 ext.get('/probe', (_req, res) => {
@@ -38,6 +39,10 @@ ext.post('/pair', async (req, res) => {
     [formatted],
   );
   if (!rows[0]) return res.status(404).json({ error: 'Code expired or already used' });
+
+  // One household, a handful of devices: caps how far anyone can multiply per-device demand.
+  const cnt = await q('SELECT count(*)::int AS n FROM devices WHERE user_id = $1', [rows[0].user_id]);
+  if (cnt.rows[0].n >= MAX_DEVICES_PER_USER) return res.status(429).json({ error: `Device limit reached (${MAX_DEVICES_PER_USER} per account)` });
 
   const token = randomToken();
   const id = randomUUID();

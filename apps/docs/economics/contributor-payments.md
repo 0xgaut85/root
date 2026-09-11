@@ -4,7 +4,7 @@ This page describes how the contributor pool is distributed and paid. For what y
 
 ## The pool
 
-For every settlement window, contributor payments equal **80% of the lab payments** that verified in that window. The pool is computed after verification, so it reflects only deliveries that will be billed.
+For every settlement window, contributor payments equal **70% of the lab payments** that verified in that window. The pool is computed after verification, so it reflects only deliveries that will be billed.
 
 ## Weighting
 
@@ -28,7 +28,7 @@ A node's payment for the window is `pool × (node_weight / total_weight)`.
 
 ## Referral bonuses
 
-Referral bonuses (10% of a referral's earnings for 12 months) are paid from Root Network's 20% share, not from the pool. They appear as a separate line in your history.
+Referral bonuses (10% of a referral's earnings for 12 months) are paid from Root Network's 30% share, not from the pool. They appear as a separate line in your history.
 
 ## Disputes
 

@@ -43,7 +43,7 @@ HOW IT WORKS
 1. Install the extension and sign in at earn.rootnetwork.co. Pairing is one click.
 2. Choose how much of your connection the network may use, from 5% to 100%. Change it or pause any time.
 3. Verified AI labs route requests for public web content through participating connections. Your node relays sealed packets it cannot read.
-4. Every byte is verified before you are paid. Labs pay per gigabyte; 80% goes to contributors, Root Network keeps a flat 20% fee. Withdraw in USDC on Base or USDG on Robinhood Chain with no fees.
+4. Every byte is verified before you are paid. Labs pay per gigabyte; 70% goes to contributors, Root Network keeps a flat 30% fee. Withdraw in USDC on Base or USDG on Robinhood Chain with no fees.
 
 WHAT YOU SEE
 • Live throughput and a sparkline of recent activity

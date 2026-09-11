@@ -26,7 +26,7 @@ A sample of deliveries is additionally checked for **response integrity**: the v
 
 ## Settlement
 
-At the end of each settlement window a validator totals verified bytes per lab and per node, computes the contributor pool (80% of lab payments) and each node's weighted share, and publishes the settlement. Contributor balances update at that moment.
+At the end of each settlement window a validator totals verified bytes per lab and per node, computes the contributor pool (70% of lab payments) and each node's weighted share, and publishes the settlement. Contributor balances update at that moment.
 
 ## Operation
 

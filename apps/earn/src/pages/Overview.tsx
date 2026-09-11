@@ -149,7 +149,7 @@ export function Overview() {
       <div className="grid grid--3">
         <Stat label="Live throughput" value={mbps(liveMbps)} loading={!me} deltaLabel={relaying.length ? 'Deliveries arrive in bursts' : 'Waiting for a node'} />
         <Stat label="Lifetime shared" value={bytes(me?.balance.totalBytes)} loading={!me} deltaLabel="Verified bytes relayed" />
-        <Stat label="Rate" value={usd(net?.now.contributorRatePerGb ?? 1)} unit="/ GB" loading={!net} deltaLabel="80% of what labs pay" />
+        <Stat label="Rate" value={usd(net?.now.contributorRatePerGb ?? 0.875, 3)} unit="/ GB" loading={!net} deltaLabel="70% of what labs pay" />
       </div>
 
       <div className="grid grid--main">

@@ -4,7 +4,7 @@ Every account has a referral link. When someone you invite installs the extensio
 
 ## How it works
 
-- **You** earn a **10% bonus** on your referral's contributor earnings for their first 12 months. The bonus is paid by Root Network from its 20% share; it is never deducted from your referral's earnings.
+- **You** earn a **10% bonus** on your referral's contributor earnings for their first 12 months. The bonus is paid by Root Network from its 30% share; it is never deducted from your referral's earnings.
 - **Your referral** receives a **$2.00 welcome credit** once their node has delivered its first 1 GB.
 
 There are no secondary or tertiary tiers. We would rather pay a clean bonus on people you actually know than build a pyramid.

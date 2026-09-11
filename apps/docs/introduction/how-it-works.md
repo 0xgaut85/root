@@ -41,7 +41,7 @@ Validators receive a receipt from the router and a receipt from your node for ev
 
 Labs pay per gigabyte delivered. Of every dollar a lab pays:
 
-<div class="rn-split"><div class="rn-split__a">80% · contributors</div><div class="rn-split__b">20% · Root</div></div>
+<div class="rn-split"><div class="rn-split__a">70% · contributors</div><div class="rn-split__b">30% · Root</div></div>
 <div class="rn-split-legend"><span>Split by bytes delivered, weighted by region and reliability</span><span>Routers, validators, support</span></div>
 
-Your share of the 80% is proportional to the verified bytes your node delivered, weighted by the demand in your region and the reliability of your connection. The math is explained in [Earnings](/guide/earnings).
+Your share of the 70% is proportional to the verified bytes your node delivered, weighted by the demand in your region and the reliability of your connection. The math is explained in [Earnings](/guide/earnings).

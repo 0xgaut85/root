@@ -14,7 +14,7 @@ In dollars. Earnings accrue continuously to your dashboard balance as deliveries
 
 ## Is there a token?
 
-No. Root Network does not have a token, a points system or an airdrop. Contributors are paid in USD for verified bandwidth, and the network keeps a flat 20% of what labs pay.
+No. Root Network does not have a token, a points system or an airdrop. Contributors are paid in USD for verified bandwidth, and the network keeps a flat 30% of what labs pay.
 
 ## Can Root Network see what I do online?
 
@@ -30,7 +30,7 @@ Only up to the allocation you set. If you allocate 30%, the network never uses m
 
 ## How much can I earn?
 
-It depends on how much bandwidth you allocate, how long your node stays online, and how much demand there is in your region. Contributors receive **$1.00 per verified GB** at the current blended rate. Today a node that stays online most of the day typically relays 3–6 GB, so a few dollars a day is normal.
+It depends on how much bandwidth you allocate, how long your node stays online, and how much demand there is in your region. Contributors receive **$0.875 per verified GB** at the current blended rate (70% of the $1.25 labs pay). Today a node that stays online most of the day typically relays 2–4 GB, so $2–3 a day is normal; at the default 25% allocation expect closer to $1.50–2.50.
 
 Be aware that this is unusually high for idle-bandwidth products, and it is high for a reason: the network is young and lab demand currently exceeds contributor supply. As more contributors join, the same demand is spread across more nodes and per-node earnings will come down. Your dashboard shows a live estimate and a history of what you have earned. There is no cap.
 
@@ -42,6 +42,6 @@ Chromium-based browsers (Chrome, Brave, Edge, Arc) on Windows, macOS and Linux v
 
 Anyone with a residential internet connection in a supported jurisdiction. Root Network is not available where sanctions or local regulation prevent us from paying contributors.
 
-## What does Root Network do with the 20%?
+## What does Root Network do with the 30%?
 
 It runs the network: routers, validators, verification infrastructure, payments, support, and the compliance work required to onboard labs. See [How Root Network makes money](/economics/how-we-make-money).
