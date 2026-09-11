@@ -70,6 +70,10 @@ network.get('/', async (_req, res) => {
   series.push({ t: now, users: s.users, nodes: s.nodes, activeNodes: s.activeNodes, gbTotal: s.gbTotal, grossUsd: s.grossUsd });
 
   const counts = apportion(s.nodes);
+  // Regional lab rates are relative to the *blended* rate: their share-weighted mean is exactly
+  // labRatePerGb, so Σ region.gb × region.ratePerGb reproduces grossUsd (cheap regions sit below
+  // $1.25, hard-to-reach ones above).
+  const blend = REGIONS.reduce((a, r) => a + r.share * r.mult, 0);
   const regions = REGIONS.map((r, i) => ({
     code: r.code,
     name: r.name,
@@ -77,7 +81,7 @@ network.get('/', async (_req, res) => {
     share: r.share,
     nodes: counts[i],
     gb: s.gbTotal * r.share,
-    ratePerGb: Number((s.labRatePerGb * r.mult).toFixed(2)),
+    ratePerGb: Number(((s.labRatePerGb * r.mult) / blend).toFixed(2)),
   }));
   const continents = CONTINENTS.map((c) => ({
     id: c.id,
