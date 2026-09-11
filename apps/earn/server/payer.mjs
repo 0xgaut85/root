@@ -10,9 +10,11 @@
  * Pacing:
  *  - Bootstrap: until MIN_FEED transactions are confirmed it sends one every
  *    BOOT_MS so the feed fills within minutes.
- *  - Steady state: cumulative payouts follow WITHDRAW_SHARE of what contributors
- *    have earned on the public curve (people leave ~30% in their balance). At
- *    most one transfer per tick, so a long downtime never turns into a burst.
+ *  - Steady state: cumulative payouts since the feed went live follow
+ *    WITHDRAW_SHARE of what contributors have earned on the public curve since
+ *    that moment (people leave ~30% in their balance). At most one transfer per
+ *    tick, so a long downtime never turns into a burst, and there is no backlog
+ *    to burn through at start.
  *  - Rail split: each payout draws its rail with probability RAILS[*].share
  *    (≈70% Robinhood Chain / 30% Base, so the realised mix wanders around
  *    that), falling back to the other rail when one is short of funds.
@@ -399,6 +401,30 @@ export async function recycleTotals() {
 
 let lastWasRecycle = false;
 
+/**
+ * Where the curve stood when the first real payout went out, and what the
+ * bootstrap burst (everything sent in the first BOOT_WINDOW) added up to.
+ * Constant once the feed exists, so it is computed once.
+ */
+const BOOT_WINDOW = '15 minutes';
+let baselineCache = null;
+async function baseline(startedAt) {
+  if (baselineCache) return baselineCache;
+  const { rows } = await q(`SELECT min(created_at) AS first FROM treasury_txs WHERE kind = 'node' AND status <> 'failed'`);
+  if (!rows[0].first) return { bootUsd: 0, paidAtStart: snapshot(startedAt).paidToContributorsUsd };
+  const first = new Date(rows[0].first);
+  const boot = await q(
+    `SELECT coalesce(sum(usd), 0)::float AS usd, count(*)::int AS n FROM treasury_txs
+     WHERE kind = 'node' AND status <> 'failed' AND created_at < $1::timestamptz + interval '${BOOT_WINDOW}'`,
+    [first],
+  );
+  // Only freeze the baseline once the bootstrap window has closed.
+  if (Date.now() - first.getTime() < 16 * 60_000) return { bootUsd: boot.rows[0].usd, paidAtStart: snapshot(startedAt, first.getTime()).paidToContributorsUsd };
+  baselineCache = { bootUsd: boot.rows[0].usd, paidAtStart: snapshot(startedAt, first.getTime()).paidToContributorsUsd };
+  console.log(`[payer] baseline: feed live since ${first.toISOString()}, bootstrap $${baselineCache.bootUsd.toFixed(2)} in ${boot.rows[0].n} txs, curve had paid $${baselineCache.paidAtStart.toFixed(0)}`);
+  return baselineCache;
+}
+
 async function tick() {
   if (sending || Date.now() < backoffUntil) return;
   const startedAt = getStartedAt();
@@ -419,7 +445,11 @@ async function tick() {
 
     const t = await totals();
     const s = snapshot(startedAt);
-    const target = s.paidToContributorsUsd * WITHDRAW_SHARE;
+    // Cumulative payouts since the feed went live follow the curve from that
+    // moment on (what contributors earned before the payer existed is not a
+    // backlog to burn through — that would drain the float in an hour).
+    const b = await baseline(startedAt);
+    const target = b.bootUsd + (s.paidToContributorsUsd - b.paidAtStart) * WITHDRAW_SHARE;
     const boot = t.confirmed < MIN_FEED;
     if (!boot && t.usd + MIN_PAYOUT > target) return; // contributors have withdrawn as much as the curve says they would
 
