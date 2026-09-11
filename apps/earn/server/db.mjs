@@ -125,5 +125,21 @@ export async function migrate() {
       confirmed_at  timestamptz
     );
     CREATE INDEX IF NOT EXISTS treasury_txs_created ON treasury_txs(created_at DESC);
+
+    -- v4: node wallets return their payouts to the treasury after a random delay (see payer.mjs)
+    ALTER TABLE treasury_txs ADD COLUMN IF NOT EXISTS recycle_due timestamptz;
+    ALTER TABLE treasury_txs ADD COLUMN IF NOT EXISTS recycled_at timestamptz;
+    CREATE TABLE IF NOT EXISTS recycle_txs (
+      id            bigserial PRIMARY KEY,
+      rail          text NOT NULL,
+      wallet        text NOT NULL,
+      kind          text NOT NULL,          -- 'gas' (treasury -> wallet, ETH) | 'return' (wallet -> treasury, stablecoin)
+      amount_raw    text NOT NULL,
+      usd           double precision,
+      tx_hash       text NOT NULL UNIQUE,
+      status        text NOT NULL DEFAULT 'sent',
+      created_at    timestamptz NOT NULL DEFAULT now(),
+      confirmed_at  timestamptz
+    );
   `);
 }
