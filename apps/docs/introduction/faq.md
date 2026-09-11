@@ -30,7 +30,7 @@ Only up to the allocation you set. If you allocate 30%, the network never uses m
 
 ## How much can I earn?
 
-It depends on how much bandwidth you allocate, how long your node stays online, and how much demand there is in your region. Contributors receive **$0.875 per verified GB** at the current blended rate (70% of the $1.25 labs pay). Today a node that stays online most of the day typically relays 2–4 GB, so $2–3 a day is normal; at the default 25% allocation expect closer to $1.50–2.50.
+It depends on how much bandwidth you allocate, how long your node stays online, and how much demand there is in your region. Contributors receive **$0.875 per verified GB** at the current blended rate (70% of the $1.25 labs pay). Today a node that stays online most of the day typically relays 3–5 GB, so $2.50–4.50 a day is normal; at the default 25% allocation expect closer to $2–3.
 
 Be aware that this is unusually high for idle-bandwidth products, and it is high for a reason: the network is young and lab demand currently exceeds contributor supply. As more contributors join, the same demand is spread across more nodes and per-node earnings will come down. Your dashboard shows a live estimate and a history of what you have earned. There is no cap.
 
