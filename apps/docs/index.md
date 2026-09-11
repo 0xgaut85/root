@@ -21,7 +21,7 @@ Root Network is built from two parts that only work together:
 2. **The Root Network** is a distributed system of nodes, routers and validators that routes traffic from AI labs through contributor connections, verifies every byte that was moved, and settles what each contributor is owed.
 
 ::: info Join Root Network
-Sign in at [earn.rootnetwork.co](https://earn.rootnetwork.co), install the extension from your dashboard, and pick how much bandwidth to allocate. Your first earnings show up the same day.
+Sign in at [earn.rootnetwork.co](https://earn.rootnetwork.co), add the extension from the [Chrome Web Store](https://chromewebstore.google.com/detail/jlgmdngjhimpgjeceddehokdjcbglebg), and pick how much bandwidth to allocate. Your first earnings show up the same day.
 :::
 
 <div class="rn-stats">

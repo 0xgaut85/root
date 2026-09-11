@@ -14,7 +14,7 @@ That is the complete job. A node does not decide where traffic goes, does not op
 Running a node is free and takes about a minute.
 
 1. Sign in at [earn.rootnetwork.co](https://earn.rootnetwork.co)
-2. Install the Root extension from the **Extension** page
+2. Add the Root extension from the [Chrome Web Store](https://chromewebstore.google.com/detail/jlgmdngjhimpgjeceddehokdjcbglebg) (or from the **Extension** page); the dashboard pairs it automatically
 3. Choose an allocation
 
 See [Set up Root Network](/guide/set-up) for the full guide.
@@ -23,7 +23,7 @@ See [Set up Root Network](/guide/set-up) for the full guide.
 
 | System | Availability | Notes |
 | --- | --- | --- |
-| Chrome, Brave, Edge, Arc (Windows, macOS, Linux) | Available via your dashboard | Chromium-based browsers, current version |
+| Chrome, Brave, Edge, Arc (Windows, macOS, Linux) | Available on the [Chrome Web Store](https://chromewebstore.google.com/detail/jlgmdngjhimpgjeceddehokdjcbglebg) | Chromium-based browsers, Chrome 116 or newer |
 | Desktop node (Windows, macOS, Linux) | In development | Runs without a browser open |
 | Android | In development | |
 

@@ -1,5 +1,9 @@
 # Chrome Web Store submission kit
 
+**Published.** Listing: https://chromewebstore.google.com/detail/jlgmdngjhimpgjeceddehokdjcbglebg · Extension ID `jlgmdngjhimpgjeceddehokdjcbglebg` (stable across updates; the server reads it from `EXTENSION_ID`).
+
+To ship an update: bump `version` in `manifest.json`, run `npm run build:extension -- --store` from `apps/earn`, upload the new `root-network-extension-store.zip` in the developer dashboard → **Package** → **Upload new package**, then **Submit for review**. Users get it automatically within a few hours of approval.
+
 Everything in this folder is ready to paste into the developer dashboard. Only steps that need your Google account are left.
 
 ## Files
@@ -88,7 +92,8 @@ Certify all three statements: not sold to third parties; not used for purposes u
 
 ## Before flipping to Public
 
-- `earn.rootnetwork.co` must resolve and serve the app (the extension's default API base and the popup's "Open dashboard" links point there). Until then the extension pairs only via the Railway preview URL, so keep the listing **Unlisted**.
-- Set `PRIVY_APP_ID` / `PRIVY_APP_SECRET` / `VITE_PRIVY_APP_ID` and `ALLOW_DEV_AUTH=0` on the `earn` service.
+- `earn.rootnetwork.co` must resolve and serve the app (the extension's default API base, its only host permission, and the popup's "Open dashboard" links point there). The custom domain is attached to the `earn` service on Railway; it goes live once the `earn` CNAME → `y9bgohn5.up.railway.app` and the `_railway-verify.earn` TXT record are added at the DNS provider for rootnetwork.co. Until then the store build cannot pair, so keep the listing **Unlisted**.
+- `PRIVY_APP_ID` / `PRIVY_APP_SECRET` / `VITE_PRIVY_APP_ID`, `ALLOW_DEV_AUTH=0`, `PUBLIC_URL` and `EXTENSION_ID` are set on the `earn` service.
+- Add `https://earn.rootnetwork.co` to the Privy app's allowed origins.
 - Bump `version` in `manifest.json` for every new upload; the store rejects duplicate versions.
 - Replace the landing page's "Coming soon" popups with the real links.

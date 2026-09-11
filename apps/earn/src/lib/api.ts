@@ -20,6 +20,8 @@ export type NetworkActivity = { t: number; region: string; bytes: number; ms: nu
 export type RailId = 'base-usdc' | 'robinhood-usdg';
 export type Rail = { id: RailId; asset: string; assetName: string; chain: string; chainId: number | null; explorer: string | null; token: string | null };
 export type TreasuryPayout = { t: number; to: string; usd: number; rail: RailId };
+export type ExtensionInfo = { id: string; version: string; storeUrl: string; browsers: string[] };
+export type AppConfig = { privyAppId: string | null; devAuth: boolean; publicUrl: string | null; treasury: string; rails: Rail[]; extension: ExtensionInfo };
 export type Network = {
   now: NetworkSnapshot;
   delta24h: { users: number; nodes: number; gbTotal: number; grossUsd: number } | null;
@@ -100,7 +102,7 @@ async function request<T>(path: string, init: RequestInit = {}, auth = true): Pr
 }
 
 export const api = {
-  config: () => request<{ privyAppId: string | null; devAuth: boolean; publicUrl: string | null; treasury: string; rails: Rail[] }>('/api/config', {}, false),
+  config: () => request<AppConfig>('/api/config', {}, false),
   network: () => request<Network>('/api/network', {}, false),
   me: () => request<Me>('/api/me'),
   updateMe: (

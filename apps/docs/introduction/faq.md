@@ -36,7 +36,7 @@ Be aware that this is unusually high for idle-bandwidth products, and it is high
 
 ## Which devices are supported?
 
-Chromium-based browsers (Chrome, Brave, Edge, Arc) on Windows, macOS and Linux via the Root extension. Desktop and mobile nodes are in development.
+Chromium-based browsers (Chrome, Brave, Edge, Arc) on Windows, macOS and Linux via the Root extension, published on the [Chrome Web Store](https://chromewebstore.google.com/detail/jlgmdngjhimpgjeceddehokdjcbglebg). Desktop and mobile nodes are in development.
 
 ## Who can join?
 

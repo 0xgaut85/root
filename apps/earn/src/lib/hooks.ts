@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, type Me, type Network } from './api';
+import { api, type AppConfig, type Me, type Network } from './api';
 import { useAuth } from './auth';
 
 /** Poll a fetcher on an interval; pauses when the tab is hidden. */
@@ -44,6 +44,23 @@ export function usePoll<T>(fetcher: () => Promise<T>, intervalMs: number, enable
 
 export function useNetwork(intervalMs = 5000) {
   return usePoll<Network>(api.network, intervalMs);
+}
+
+/** Public app config (/api/config), fetched once per session and shared. */
+let configPromise: Promise<AppConfig> | null = null;
+let configCache: AppConfig | null = null;
+export function useConfig() {
+  const [cfg, setCfg] = useState<AppConfig | null>(configCache);
+  useEffect(() => {
+    if (configCache) return;
+    configPromise ??= api.config().then((c) => (configCache = c));
+    let alive = true;
+    configPromise.then((c) => alive && setCfg(c)).catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return cfg;
 }
 
 export function useMe(intervalMs = 6000) {

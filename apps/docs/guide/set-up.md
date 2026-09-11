@@ -10,7 +10,7 @@ The network is not using your computer or looking at anything you do on it. It r
 
 <ol class="rn-steps">
 <li><strong>Sign in at earn.rootnetwork.co</strong>Go to <a href="https://earn.rootnetwork.co">earn.rootnetwork.co</a> and sign in with your email, Google, or a wallet. An account is created for you on first sign-in.</li>
-<li><strong>Install the Root extension</strong>From the <em>Extension</em> page of your dashboard, download the extension and add it to Chrome, Brave, Edge or Arc. The dashboard pairs with it automatically the first time it opens.</li>
+<li><strong>Install the Root extension</strong>Add it from the <a href="https://chromewebstore.google.com/detail/jlgmdngjhimpgjeceddehokdjcbglebg">Chrome Web Store</a> (one listing for Chrome, Brave, Edge, Arc and other Chromium browsers), or click <em>Add to Chrome</em> on the <em>Extension</em> page of your dashboard. Then go back to the dashboard: it detects the extension and pairs it with your account automatically. If you install on a second computer, click the Root icon and type the pairing code shown in the dashboard instead.</li>
 <li><strong>Choose your allocation</strong>Pick what share of your connection the network may use. 25% is a sensible start. You can change or pause it at any time, from the dashboard or the extension.</li>
 </ol>
 
@@ -20,7 +20,7 @@ That's it. Your dashboard now shows your node's status, throughput, and earnings
 
 | Requirement | Details |
 | --- | --- |
-| Browser | Chrome, Brave, Edge, Arc or another Chromium-based browser, current version |
+| Browser | Chrome 116 or newer, or Brave, Edge, Arc or another Chromium-based browser that installs from the Chrome Web Store |
 | Connection | A residential connection. Data-center, VPN and most mobile carrier IPs are not eligible |
 | Uptime | Any. More uptime means more deliveries, but there is no minimum |
 | Account | One account per person. Multiple devices per account are fine |
@@ -28,6 +28,12 @@ That's it. Your dashboard now shows your node's status, throughput, and earnings
 ## Running more than one device
 
 You can pair the extension on several computers to the same account. Each shows up as its own node in your dashboard with its own throughput and status, and all of them pay into the same balance. Devices on the same public IP share that IP's demand; the network does not pay twice for the same connection.
+
+## Permissions and updates
+
+The extension asks for one site permission, `earn.rootnetwork.co`, which is its own backend and the only page it ever touches. It uses local storage for your pairing token and settings, and a timer for its 30-second heartbeat. It does not request access to tabs, history, cookies, downloads or the clipboard.
+
+Updates ship through the Chrome Web Store and install in the background, like any other extension. You never need to download anything again.
 
 ## Pausing and leaving
 

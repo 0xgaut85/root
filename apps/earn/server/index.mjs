@@ -9,6 +9,7 @@ import { me } from './routes/me.mjs';
 import { ext } from './routes/ext.mjs';
 import { privyConfigured, devAuthEnabled } from './auth.mjs';
 import { TREASURY_ADDRESS, publicRails } from './rails.mjs';
+import { publicExtension, isAllowedExtensionOrigin, STORE_URL } from './extension.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const distDir = join(here, '..', 'dist');
@@ -19,10 +20,12 @@ app.disable('x-powered-by');
 app.set('trust proxy', true);
 app.use(express.json({ limit: '64kb' }));
 
-// CORS for the extension (chrome-extension:// origins) on the API only.
+// CORS for the extension on the API only. Production trusts the published store
+// build; unpacked dev builds are accepted while dev auth is enabled (or via EXTENSION_IDS).
 app.use('/api', (req, res, next) => {
   const origin = req.headers.origin || '';
-  if (/^chrome-extension:\/\//.test(origin) || /^moz-extension:\/\//.test(origin) || /^https?:\/\/localhost(:\d+)?$/.test(origin)) {
+  const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  if (isAllowedExtensionOrigin(origin, { allowAny: devAuthEnabled }) || (devAuthEnabled && isLocal)) {
     res.set({
       'Access-Control-Allow-Origin': origin,
       'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
@@ -43,8 +46,11 @@ app.get('/api/config', (_req, res) =>
     publicUrl: process.env.PUBLIC_URL || null,
     treasury: TREASURY_ADDRESS,
     rails: publicRails(),
+    extension: publicExtension(),
   }),
 );
+// Stable short link for the store listing (used in docs, emails, the landing page).
+app.get('/extension/install', (_req, res) => res.redirect(302, STORE_URL));
 app.use('/api/network', network);
 app.use('/api/me', me);
 app.use('/api/ext', ext);
