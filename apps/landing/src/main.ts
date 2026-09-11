@@ -42,7 +42,7 @@ document.addEventListener('click', (e) => {
   const a = target.closest<HTMLElement>('a[href], [data-soon-trigger]');
   if (!a) return;
   const href = a.getAttribute('href') || '';
-  if (a.hasAttribute('data-soon-trigger') || /use\.rootnetwork\.co|read\.rootnetwork\.co/.test(href)) {
+  if (a.hasAttribute('data-soon-trigger') || /earn\.rootnetwork\.co|read\.rootnetwork\.co/.test(href)) {
     e.preventDefault();
     showSoon();
   }

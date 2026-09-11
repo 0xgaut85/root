@@ -28,7 +28,15 @@ const types = {
   '.wasm': 'application/wasm',
 };
 
+// Canonical host: anything arriving on a default *.up.railway.app host is sent to the real domain.
+const canonical = (process.env.CANONICAL_HOST || 'rootnetwork.co').trim();
+
 createServer((req, res) => {
+  const host = String(req.headers.host || '').split(':')[0];
+  if (/\.up\.railway\.app$/i.test(host) && host !== canonical) {
+    res.writeHead(301, { Location: `https://${canonical}${req.url || '/'}`, 'Cache-Control': 'no-cache' }).end();
+    return;
+  }
   const url = new URL(req.url || '/', 'http://localhost');
   let pathname = decodeURIComponent(url.pathname);
   if (pathname.endsWith('/')) pathname += 'index.html';

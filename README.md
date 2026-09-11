@@ -4,9 +4,10 @@ Monorepo for the Root Network web properties. Each app is deployed as its own Ra
 
 | App | Path | Domain | Status |
 | --- | --- | --- | --- |
-| Landing | `apps/landing` | `rootnetwork.co` | built |
-| Protocol docs | `apps/read` | `read.rootnetwork.co` | todo |
-| dApp | `apps/use` | `use.rootnetwork.co` | todo |
+| Landing | `apps/landing` | `rootnetwork.co` | live |
+| Protocol docs | `apps/docs` | `read.rootnetwork.co` | live |
+| Earn app (dashboard + API) | `apps/earn` | `earn.rootnetwork.co` | live |
+| Browser extension | `apps/extension` | [Chrome Web Store](https://chromewebstore.google.com/detail/jlgmdngjhimpgjeceddehokdjcbglebg) | published |
 
 Brand mark: `logo.png` (source) — processed copies live in `apps/landing/public/assets/brand/`.
 

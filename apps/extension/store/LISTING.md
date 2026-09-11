@@ -92,7 +92,7 @@ Certify all three statements: not sold to third parties; not used for purposes u
 
 ## Before flipping to Public
 
-- `earn.rootnetwork.co` must resolve and serve the app (the extension's default API base, its only host permission, and the popup's "Open dashboard" links point there). The custom domain is attached to the `earn` service on Railway; it goes live once the `earn` CNAME → `y9bgohn5.up.railway.app` and the `_railway-verify.earn` TXT record are added at the DNS provider for rootnetwork.co. Until then the store build cannot pair, so keep the listing **Unlisted**.
+- `earn.rootnetwork.co` is live and is the extension's default API base, its only host permission, and the popup's "Open dashboard" target. The default `*.up.railway.app` domains were removed; each service redirects any stray Railway host to its canonical domain.
 - `PRIVY_APP_ID` / `PRIVY_APP_SECRET` / `VITE_PRIVY_APP_ID`, `ALLOW_DEV_AUTH=0`, `PUBLIC_URL` and `EXTENSION_ID` are set on the `earn` service.
 - Add `https://earn.rootnetwork.co` to the Privy app's allowed origins.
 - Bump `version` in `manifest.json` for every new upload; the store rejects duplicate versions.

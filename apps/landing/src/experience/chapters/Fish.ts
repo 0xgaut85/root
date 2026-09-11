@@ -45,12 +45,12 @@ export class Fish extends Chapter {
       y: 0.5,
       extra: `
         <div class="beat__actions">
-          <a class="btn btn--primary" href="https://use.rootnetwork.co">Start earning</a>
+          <a class="btn btn--primary" href="https://earn.rootnetwork.co">Start earning</a>
           <a class="btn btn--ghost" href="https://read.rootnetwork.co">Read the protocol</a>
         </div>
         <nav class="beat__footer" aria-label="Footer">
           <a href="https://read.rootnetwork.co">Protocol</a>
-          <a href="https://use.rootnetwork.co">App</a>
+          <a href="https://earn.rootnetwork.co">App</a>
           <a href="https://x.com/rootnetworkco" rel="noopener" target="_blank">X</a>
           <a href="mailto:hello@rootnetwork.co">Contact</a>
           <span>\u00a9 ${new Date().getFullYear()} Root Network</span>

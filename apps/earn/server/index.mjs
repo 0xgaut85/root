@@ -20,6 +20,22 @@ app.disable('x-powered-by');
 app.set('trust proxy', true);
 app.use(express.json({ limit: '64kb' }));
 
+// Canonical host: requests on a default *.up.railway.app host go to PUBLIC_URL (earn.rootnetwork.co).
+const canonicalHost = (() => {
+  try {
+    return process.env.PUBLIC_URL ? new URL(process.env.PUBLIC_URL).host : null;
+  } catch {
+    return null;
+  }
+})();
+app.use((req, res, next) => {
+  const host = String(req.headers.host || '').split(':')[0];
+  if (canonicalHost && /\.up\.railway\.app$/i.test(host) && host !== canonicalHost) {
+    return res.redirect(301, `https://${canonicalHost}${req.originalUrl}`);
+  }
+  next();
+});
+
 // CORS for the extension on the API only. Production trusts the published store
 // build; unpacked dev builds are accepted while dev auth is enabled (or via EXTENSION_IDS).
 app.use('/api', (req, res, next) => {
