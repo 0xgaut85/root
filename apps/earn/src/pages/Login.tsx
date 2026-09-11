@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Heat } from '../components/Heat';
+import { Grain } from '../components/Grain';
 import { Num } from '../components/ui';
 import { useAuth } from '../lib/auth';
 import { useNetwork } from '../lib/hooks';
@@ -47,7 +47,7 @@ export function Login() {
         </div>
       </div>
       <div className="login__right">
-        <Heat />
+        <Grain />
         <motion.div className="login__stats" initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}>
           <div className="login__stat">
             <div className="eyebrow">Contributors</div>

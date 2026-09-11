@@ -7,7 +7,8 @@ export type RailMeta = {
   chain: string;
   assetLogo: string;
   chainLogo: string;
-  explorerAddr: ((addr: string) => string) | null;
+  explorerAddr: (addr: string) => string;
+  explorerTx: (hash: string) => string;
   note: string;
 };
 
@@ -21,6 +22,7 @@ export const RAILS: Record<RailId, RailMeta> = {
     assetLogo: '/rails/usdc.png',
     chainLogo: '/rails/base.svg',
     explorerAddr: (a) => `https://basescan.org/address/${a}`,
+    explorerTx: (h) => `https://basescan.org/tx/${h}`,
     note: 'Circle’s dollar stablecoin on Base, Coinbase’s Ethereum L2. Works with any EVM wallet.',
   },
   'robinhood-usdg': {
@@ -30,8 +32,9 @@ export const RAILS: Record<RailId, RailMeta> = {
     chain: 'Robinhood Chain',
     assetLogo: '/rails/usdg.png',
     chainLogo: '/rails/robinhood-feather-white.svg',
-    explorerAddr: null,
-    note: 'Paxos’ Global Dollar on Robinhood Chain. Use your Robinhood wallet address or any EVM wallet.',
+    explorerAddr: (a) => `https://robinhoodchain.blockscout.com/address/${a}`,
+    explorerTx: (h) => `https://robinhoodchain.blockscout.com/tx/${h}`,
+    note: 'Paxos’ Global Dollar on Robinhood Chain (chain ID 4663). Use your Robinhood wallet address or any EVM wallet.',
   },
 };
 

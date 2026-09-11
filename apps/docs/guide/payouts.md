@@ -13,7 +13,9 @@ Root Network pays in fully-reserved dollar stablecoins, on two rails. You pick o
 | | USDC on Base | USDG on Robinhood Chain |
 | --- | --- | --- |
 | Issuer | Circle | Paxos (Global Dollar Network) |
-| Network | Base, Coinbase's Ethereum L2 | Robinhood Chain |
+| Network | Base, Coinbase's Ethereum L2 (chain ID 8453) | Robinhood Chain, an Arbitrum Orbit L2 (chain ID 4663) |
+| Token contract | `0x8335…2913` | `0x5fc5…d168` |
+| Explorer | [basescan.org](https://basescan.org/address/0x3e32A1b643A81927802E7Fa202709395Ce8D1821) | [robinhoodchain.blockscout.com](https://robinhoodchain.blockscout.com/address/0x3e32A1b643A81927802E7Fa202709395Ce8D1821) |
 | Address format | `0x…` (any EVM wallet) | `0x…` (Robinhood wallet or any EVM wallet) |
 | Typical settlement | Under a minute | Under a minute |
 | Fee | None | None |
@@ -26,7 +28,7 @@ Both are 1:1 dollar tokens. One `0x` address works for either rail, so you can s
 2. Pick your rail and enter your payout address. If you signed in with a wallet, you can use it in one tap.
 3. Press **Withdraw** and confirm the amount.
 
-Withdrawals are sent from the Root Network treasury, `0x3e32A1b643A81927802E7Fa202709395Ce8D1821`. Every payout leaving the treasury is listed on the **Data** page of the dashboard, so you can verify yours on-chain.
+Withdrawals are sent from the Root Network treasury, `0x3e32A1b643A81927802E7Fa202709395Ce8D1821`, on both chains. The **Data** page of the dashboard lists the latest transfers leaving the treasury with a link to each transaction, so you can verify yours on-chain.
 
 | | |
 | --- | --- |

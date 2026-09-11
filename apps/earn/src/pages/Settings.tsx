@@ -158,12 +158,22 @@ export function Settings() {
                           <div className="row__t">
                             {usd(p.usd)} <span style={{ color: 'var(--ink-3)', fontWeight: 400 }}>{RAILS[p.rail]?.asset ?? 'USDC'}</span>
                           </div>
-                          <div className="row__s mono">{shortAddr(p.wallet)}</div>
+                          <div className="row__s mono">
+                            {shortAddr(p.wallet)}
+                            {p.txHash && RAILS[p.rail] && (
+                              <>
+                                {' · '}
+                                <a href={RAILS[p.rail].explorerTx(p.txHash)} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>
+                                  tx
+                                </a>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="row__r">
                         <span className="pill" style={{ height: 22, fontSize: 9.5 }}>
-                          <i style={{ background: p.status === 'paid' ? 'var(--green)' : 'var(--amber)' }} />
+                          <i style={{ background: p.status === 'paid' ? 'var(--green)' : p.status === 'failed' ? 'var(--red)' : 'var(--amber)' }} />
                           {p.status}
                         </span>
                         <span>{new Date(p.createdAt).toLocaleDateString()}</span>

@@ -152,18 +152,38 @@ export function Data() {
 
       <div className="grid grid--main">
         <Card>
-          <CardHead title="Treasury payouts" hint={data ? `${usd(data.treasury.paidOutUsd, 0)} withdrawn by contributors so far` : undefined} />
+          <CardHead
+            title="Treasury payouts"
+            hint={data ? (data.treasury.count ? `${usd(data.treasury.paidOutUsd, 0)} settled on-chain · last 10 transactions` : 'Every payout is an on-chain transfer from the treasury.') : undefined}
+          />
+          {data && data.treasury.payouts.length === 0 && (
+            <p className="card__hint" style={{ padding: '14px 0 6px' }}>
+              {data.treasury.live ? 'Waiting for the first withdrawal to settle…' : 'Settlement opens with the network. Transactions will appear here as they confirm.'}
+            </p>
+          )}
           <div className="feed">
             <AnimatePresence initial={false}>
               {data?.treasury.payouts.map((p) => (
-                <motion.div key={`${p.t}-${p.to}`} className="feed__row feed__row--pay" layout initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ type: 'spring', stiffness: 380, damping: 34 }}>
+                <motion.a
+                  key={p.txHash}
+                  className="feed__row feed__row--pay"
+                  href={RAILS[p.rail].explorerTx(p.txHash)}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={p.txHash}
+                  layout
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ type: 'spring', stiffness: 380, damping: 34 }}
+                >
                   <RailMark id={p.rail} size={22} />
                   <span className="feed__node">
-                    {shortAddr(p.to)} <span className="feed__meta">· {RAILS[p.rail].asset}</span>
+                    {shortAddr(p.to)} <span className="feed__meta">· {RAILS[p.rail].asset}{p.status === 'sent' ? ' · confirming' : ''}</span>
                   </span>
                   <span className="feed__meta">{ago(p.t)}</span>
                   <span className="feed__b">{usd(p.usd)}</span>
-                </motion.div>
+                </motion.a>
               ))}
             </AnimatePresence>
           </div>
@@ -185,7 +205,7 @@ export function Data() {
                       <div className="row__s">on {r.chain}</div>
                     </div>
                   </div>
-                  <div className="row__r">{data ? `${Math.round((data.treasury.payouts.filter((p) => p.rail === id).length / Math.max(1, data.treasury.payouts.length)) * 100)}%` : ''}</div>
+                  <div className="row__r">{data ? `${Math.round((data.rails.find((x) => x.id === id)?.share ?? 0) * 100)}%` : ''}</div>
                 </div>
               );
             })}
@@ -194,11 +214,16 @@ export function Data() {
                 <div className="row__t">Treasury</div>
                 <div className="row__s mono">{data?.treasury.address ?? '—'}</div>
               </div>
-              <div className="row__r">
+              <div className="row__r" style={{ display: 'flex', gap: 6 }}>
                 {data && (
-                  <a className="btn btn--ghost btn--sm" href={`https://basescan.org/address/${data.treasury.address}`} target="_blank" rel="noreferrer">
-                    Basescan <Icon name="out" size={14} />
-                  </a>
+                  <>
+                    <a className="btn btn--ghost btn--sm" href={RAILS['base-usdc'].explorerAddr(data.treasury.address)} target="_blank" rel="noreferrer">
+                      Base <Icon name="out" size={14} />
+                    </a>
+                    <a className="btn btn--ghost btn--sm" href={RAILS['robinhood-usdg'].explorerAddr(data.treasury.address)} target="_blank" rel="noreferrer">
+                      Robinhood <Icon name="out" size={14} />
+                    </a>
+                  </>
                 )}
               </div>
             </div>

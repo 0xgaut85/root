@@ -4,6 +4,7 @@ import { dirname, join, extname, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { migrate } from './db.mjs';
 import { startWorker } from './worker.mjs';
+import { startPayer } from './payer.mjs';
 import { network } from './routes/network.mjs';
 import { me } from './routes/me.mjs';
 import { ext } from './routes/ext.mjs';
@@ -122,6 +123,7 @@ async function main() {
   await migrate();
   await startWorker();
   app.listen(port, '0.0.0.0', () => console.log(`root network earn listening on :${port}`));
+  startPayer().catch((e) => console.error('[payer] failed to start', e.message));
 }
 
 main().catch((e) => {

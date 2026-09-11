@@ -1,39 +1,43 @@
 /**
  * Public network trajectory.
  *
- * T0 = first boot of the worker (persisted once in network_state.started_at).
- * The chart is backdated HISTORY_DAYS before T0 and the network is scheduled to
+ * T0 = public opening (network_state.started_at). The network is scheduled to
  * reach the ceiling GROWTH_DAYS after T0, then keeps compounding slowly.
  *
- *            history start        T0 (boot)            ceiling
- *   users        48       →        100        →          760
- *   gross USD   (derived) →      1,000        →       11,000
+ *                 T0 (opening)              ceiling (T0 + 7 d)
+ *   users              80          →             1,037
+ *   gross USD         260          →            11,000
  *
- * The history window is the closed pilot (invited contributors) that preceded
- * the public opening at T0.
+ * The 80 contributors and $260 at T0 are the invited beta cohort and the one
+ * day of deliveries they completed before the public opening; there is no
+ * backdated history (HISTORY_DAYS = 0), the chart starts at T0.
  *
- * Revenue is not an independent curve: it is the integral of contributors ×
- * a constant revenue per contributor-day (ARPU). ARPU is solved so that gross
- * passes through $1,000 at T0 and $11,000 at the ceiling. This keeps every
- * derived figure coherent by construction: daily revenue, GB per day and live
- * throughput are all proportional to how many contributors exist at that
- * moment, and there is no kink when the growth window ends.
+ * Contributors follow a single power curve (slow start, accelerating as
+ * referrals compound). Revenue is not an independent curve: it is the integral
+ * of contributors × a constant revenue per contributor-day (ARPU). ARPU is
+ * solved so that gross passes through $11,000 at the ceiling; at $1.25/GB that
+ * is ≈2.6 GB per contributor per day, i.e. ≈$2.6/day to a contributor, which is
+ * what the docs and FAQ quote. Every derived figure is therefore coherent by
+ * construction: daily revenue, GB/day and live throughput are all proportional
+ * to how many contributors exist at that moment.
  *
  * Cumulative figures (users, gross, GB) are pure functions of time so that
  * restarts never move them. Only instantaneous figures (active nodes, live
  * throughput) carry a diurnal rhythm and noise.
  *
  * Bump CURVE_VERSION whenever the curve constants change; the worker then
- * discards stored samples and re-backfills so the chart has no kink.
+ * resets T0 (to NETWORK_STARTED_AT or now) and regenerates the stored samples.
  */
 
-export const CURVE_VERSION = 2;
-export const HISTORY_DAYS = 2;
-export const GROWTH_DAYS = 4;
+export const CURVE_VERSION = 3;
+export const HISTORY_DAYS = 0;
+export const GROWTH_DAYS = 7;
 export const DAY_MS = 86_400_000;
 
-export const USERS = { start: 48, boot: 100, ceiling: 760 };
-export const GROSS = { boot: 1_000, ceiling: 11_000 };
+export const USERS = { start: 80, ceiling: 1_037 };
+export const GROSS = { start: 260, ceiling: 11_000 };
+/** Shape of the contributor curve: >1 = slow start that accelerates. */
+const USERS_EXP = 1.35;
 
 /** Labs pay per GB (blended). Contributors receive 80% of it. */
 export const LAB_RATE_PER_GB = 1.25;
@@ -48,19 +52,8 @@ const POST_CEILING_DAILY_GROWTH = 0.022;
 
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 const SPAN_DAYS = HISTORY_DAYS + GROWTH_DAYS;
-const K = HISTORY_DAYS / SPAN_DAYS; // normalised position of T0
 
-/**
- * Power curve through three points: value(0)=a, value(k)=b, value(1)=c where
- * k is the normalised position of T0 in the window (HISTORY / (HISTORY+GROWTH)).
- */
-function powerCurve(a, b, c) {
-  const f = (b - a) / (c - a);
-  const exp = Math.log(f) / Math.log(K);
-  return (p) => a + (c - a) * Math.pow(clamp01(p), exp);
-}
-
-const usersCurve = powerCurve(USERS.start, USERS.boot, USERS.ceiling);
+const usersCurve = (p) => USERS.start + (USERS.ceiling - USERS.start) * Math.pow(clamp01(p), USERS_EXP);
 
 /** Contributors as a continuous function of normalised progress (post-ceiling compounding included). */
 function usersRaw(p) {
@@ -88,9 +81,9 @@ function userDays(p) {
   return usersCum[STEPS] + (USERS.ceiling * (Math.exp(g * days) - 1)) / g;
 }
 
-/** Revenue per contributor-day, solved from the two anchors. */
-export const ARPU_PER_DAY = (GROSS.ceiling - GROSS.boot) / (userDays(1) - userDays(K));
-const GROSS_START = GROSS.boot - ARPU_PER_DAY * userDays(K);
+/** Revenue per contributor-day, solved so gross hits the ceiling exactly at the end of the window. */
+export const ARPU_PER_DAY = (GROSS.ceiling - GROSS.start) / userDays(1);
+const GROSS_START = GROSS.start;
 
 /** Normalised progress through the growth window for a given time. */
 export function progress(startedAtMs, nowMs) {

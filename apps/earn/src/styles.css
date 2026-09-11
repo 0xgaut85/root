@@ -774,6 +774,11 @@ select {
 
 .feed__row--pay {
   grid-template-columns: 22px 1fr auto auto;
+  color: inherit;
+  text-decoration: none;
+}
+a.feed__row--pay:hover .feed__node {
+  text-decoration: underline;
 }
 
 /* ---------- Payout rails ---------- */

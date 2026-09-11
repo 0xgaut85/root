@@ -18,8 +18,8 @@ export type NetworkRegion = { code: string; name: string; continent: Continent; 
 export type NetworkContinent = { id: Continent; name: string; share: number; nodes: number };
 export type NetworkActivity = { t: number; region: string; bytes: number; ms: number; node: string; verified: boolean };
 export type RailId = 'base-usdc' | 'robinhood-usdg';
-export type Rail = { id: RailId; asset: string; assetName: string; chain: string; chainId: number | null; explorer: string | null; token: string | null };
-export type TreasuryPayout = { t: number; to: string; usd: number; rail: RailId };
+export type Rail = { id: RailId; asset: string; assetName: string; chain: string; chainId: number; explorer: string; token: string; share: number };
+export type TreasuryPayout = { t: number; to: string; usd: number; rail: RailId; txHash: string; status: 'sent' | 'confirmed' };
 export type ExtensionInfo = { id: string; version: string; storeUrl: string; browsers: string[] };
 export type AppConfig = { privyAppId: string | null; devAuth: boolean; publicUrl: string | null; treasury: string; rails: Rail[]; extension: ExtensionInfo };
 export type Network = {
@@ -29,7 +29,7 @@ export type Network = {
   regions: NetworkRegion[];
   continents: NetworkContinent[];
   activity: NetworkActivity[];
-  treasury: { address: string; paidOutUsd: number; payouts: TreasuryPayout[] };
+  treasury: { address: string; live: boolean; paidOutUsd: number; count: number; payouts: TreasuryPayout[] };
   rails: Rail[];
   meta: { startedAt: number; historyDays: number; growthDays: number; contributorShare: number; arpuPerDay: number };
 };

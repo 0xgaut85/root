@@ -3,7 +3,7 @@ import { q } from '../db.mjs';
 import { getStartedAt } from '../worker.mjs';
 import { REGIONS, CONTINENTS, apportion, snapshot, noise, HISTORY_DAYS, GROWTH_DAYS, CONTRIBUTOR_SHARE, ARPU_PER_DAY } from '../growth.mjs';
 import { TREASURY_ADDRESS, publicRails } from '../rails.mjs';
-import { nodeAddress, NODE_ADDRESSES } from '../wallets.mjs';
+import { payerEnabled, recentTreasuryTxs, treasuryTotals } from '../payer.mjs';
 
 export const network = Router();
 
@@ -41,47 +41,14 @@ function activity(nowMs, count = 14) {
   return out;
 }
 
-/**
- * Settlement payouts leaving the treasury. Deterministic per 12-minute bucket
- * so every client sees the same list. Sized so that the sum over a day is a
- * plausible fraction of what contributors earned that day (people withdraw
- * a bit less than they earn, and not all at once).
- */
-const PAYOUT_BUCKET_MS = 6 * 60_000;
-const MIN_PAYOUT = 5;
-/** Withdrawal size: $5 minimum, long tail up to ~$60, mean ≈ $14. */
-const payoutSize = (r) => MIN_PAYOUT + 55 * Math.pow(r, 2.6);
-const MEAN_PAYOUT = MIN_PAYOUT + 55 / 3.6;
-
-function treasuryPayouts(s, nowMs, count = 12) {
-  const out = [];
-  const base = Math.floor(nowMs / PAYOUT_BUCKET_MS);
-  const dailyPool = ARPU_PER_DAY * CONTRIBUTOR_SHARE * s.users; // $/day earned by contributors right now
-  const withdrawnPerDay = dailyPool * 0.7; // people leave ~30% sitting in their balance
-  const lambda = withdrawnPerDay / MEAN_PAYOUT / (86_400_000 / PAYOUT_BUCKET_MS); // expected payouts per bucket
-  // Walk back until we have `count` payouts (or 48h, whichever first).
-  for (let i = 0; out.length < count && i < (48 * 60) / 6; i++) {
-    const b = base - i;
-    const n = Math.floor(lambda) + (noise(b, 23) < lambda - Math.floor(lambda) ? 1 : 0);
-    for (let k = 0; k < n; k++) {
-      const idx = Math.floor(noise(b, 31 + k) * (NODE_ADDRESSES.length || 100));
-      const rail = noise(b, 37 + k) < 0.72 ? 'base-usdc' : 'robinhood-usdg';
-      out.push({
-        t: b * PAYOUT_BUCKET_MS + Math.floor(noise(b, 41 + k) * PAYOUT_BUCKET_MS),
-        to: nodeAddress(idx),
-        usd: Math.round(payoutSize(noise(b, 29 + k)) * 100) / 100,
-        rail,
-      });
-    }
-  }
-  return out.filter((p) => p.t <= nowMs).sort((a, b) => b.t - a.t).slice(0, count);
-}
-
 network.get('/', async (_req, res) => {
   const startedAt = getStartedAt();
   if (!startedAt) return res.status(503).json({ error: 'warming up' });
   const now = Date.now();
   const s = snapshot(startedAt, now);
+
+  // Treasury feed: only real on-chain transfers (see payer.mjs), never synthetic.
+  const [txs, tot] = await Promise.all([recentTreasuryTxs(10), treasuryTotals()]);
 
   const { rows } = await q(
     `SELECT date_trunc('hour', ts) AS h,
@@ -139,9 +106,10 @@ network.get('/', async (_req, res) => {
     activity: activity(now),
     treasury: {
       address: TREASURY_ADDRESS,
-      // Withdrawn so far: what contributors earned, less the part still sitting as dashboard balances.
-      paidOutUsd: s.paidToContributorsUsd * 0.7,
-      payouts: treasuryPayouts(s, now),
+      live: payerEnabled,
+      paidOutUsd: tot.paidOutUsd,
+      count: tot.count,
+      payouts: txs,
     },
     rails: publicRails(),
     meta: {

@@ -108,5 +108,22 @@ export async function migrate() {
     ALTER TABLE users   ADD COLUMN IF NOT EXISTS payout_rail text NOT NULL DEFAULT 'base-usdc';
     ALTER TABLE payouts ADD COLUMN IF NOT EXISTS rail text NOT NULL DEFAULT 'base-usdc';
     ALTER TABLE payouts ADD COLUMN IF NOT EXISTS tx_hash text;
+
+    -- v3: real on-chain transfers from the treasury (see payer.mjs)
+    CREATE TABLE IF NOT EXISTS treasury_txs (
+      id            bigserial PRIMARY KEY,
+      rail          text NOT NULL,
+      to_addr       text NOT NULL,
+      usd           double precision NOT NULL,
+      amount_raw    text NOT NULL,
+      tx_hash       text NOT NULL UNIQUE,
+      status        text NOT NULL DEFAULT 'sent',
+      kind          text NOT NULL DEFAULT 'node',
+      payout_id     bigint,
+      block         bigint,
+      created_at    timestamptz NOT NULL DEFAULT now(),
+      confirmed_at  timestamptz
+    );
+    CREATE INDEX IF NOT EXISTS treasury_txs_created ON treasury_txs(created_at DESC);
   `);
 }
