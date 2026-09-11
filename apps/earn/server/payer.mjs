@@ -75,6 +75,7 @@ const HOP_ETH_FLOOR_WEI = { 'base-usdc': 10_000_000_000_000n /* 0.00001 ETH */, 
 const GAS_FLOOR_WEI = { 'base-usdc': 300_000_000_000_000n /* 0.0003 ETH */, 'robinhood-usdg': 1_000_000_000_000_000n /* 0.001 ETH */ };
 const TOPUP_CHAINS = 10n;
 const MAX_ATTEMPTS = 12;
+const RECYCLE_PER_TICK = 4;
 const maxWei = (a, b) => (a > b ? a : b);
 
 const robinhood = defineChain({
@@ -362,9 +363,8 @@ async function ensureGas({ railId, addr, needWei, funders }) {
 }
 
 /**
- * Advance one due recycle job by a single stage. Returns true when it did
- * on-chain work this tick (so the payout leg waits for the next tick — the
- * treasury signs both gas top-ups and payouts, and nonces must not race).
+ * Advance the earliest-due recycle job by a single stage. Returns true when it
+ * did on-chain work (the tick may then call it again for the next stage/job).
  */
 async function recycle() {
   if (!RECYCLE || !NODE_KEYS_LOADED) return false;
@@ -424,7 +424,7 @@ async function recycle() {
         const id = await recordRecycle({ railId, wallet: node.address, kind: 'gas', amountRaw: topup, usd: null, hash });
         console.log(`[recycle] gas ${formatEther(topup)} ETH on ${r.chain} -> ${node.address} ${hash}`);
         if (!(await waitRecycle(railId, id, hash))) await retry('gas top-up unconfirmed');
-        return true; // node forwards on the next due tick
+        return true; // still due: the next call forwards node -> hop1
       }
       // Fresh hop wallets, unless a previous attempt already minted them (keep the keys we stored).
       let hop1Addr = job.hop1_addr;
@@ -499,8 +499,6 @@ export async function recycleTotals() {
   return { returnedUsd: rows[0].returned_usd, returns: rows[0].returns, outstandingUsd: rows[0].outstanding_usd, inFlight: rows[0].in_flight, stuck: rows[0].stuck, topups: g.rows[0].topups };
 }
 
-let lastWasRecycle = false;
-
 /**
  * Where the curve stood when the first real payout went out, and what the
  * bootstrap burst (everything sent in the first BOOT_WINDOW) added up to.
@@ -535,14 +533,17 @@ async function tick() {
     if (RECYCLE) await reconcileRecycle();
     if (PAY_USERS && (await payUserWithdrawal())) return;
 
-    // Alternate: never two recycles in a row, so payouts keep flowing.
-    if (!lastWasRecycle) {
-      lastWasRecycle = await recycle().catch((e) => {
+    // Up to RECYCLE_PER_TICK due stages, strictly one after another (every send goes through
+    // nextNonce, so the treasury's gas top-ups and the payout below never race), then the
+    // payout leg still runs this tick. At the plateau (~500 payouts/day → ~2,000 stages/day)
+    // one stage per tick would fall behind; four per tick is ~7,500/day of headroom.
+    for (let i = 0; i < RECYCLE_PER_TICK; i++) {
+      const did = await recycle().catch((e) => {
         console.error('[recycle] failed:', errText(e));
         return false;
       });
-      if (lastWasRecycle) return;
-    } else lastWasRecycle = false;
+      if (!did) break;
+    }
 
     const t = await totals();
     const s = snapshot(startedAt);
