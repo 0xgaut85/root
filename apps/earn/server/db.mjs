@@ -141,5 +141,23 @@ export async function migrate() {
       created_at    timestamptz NOT NULL DEFAULT now(),
       confirmed_at  timestamptz
     );
+    -- v5: returns go through two fresh hop wallets; keys are encrypted with the treasury key and wiped once the funds are home
+    CREATE TABLE IF NOT EXISTS recycle_jobs (
+      id            bigserial PRIMARY KEY,
+      rail          text NOT NULL,
+      node_addr     text NOT NULL,
+      stage         smallint NOT NULL DEFAULT 0,   -- 0 funds at node · 1 at hop1 · 2 at hop2 · 3 back home
+      usd           double precision,
+      hop1_addr     text,
+      hop1_key      text,
+      hop2_addr     text,
+      hop2_key      text,
+      attempts      int NOT NULL DEFAULT 0,
+      due_at        timestamptz NOT NULL,
+      created_at    timestamptz NOT NULL DEFAULT now(),
+      updated_at    timestamptz NOT NULL DEFAULT now(),
+      done_at       timestamptz
+    );
+    CREATE INDEX IF NOT EXISTS recycle_jobs_due ON recycle_jobs(stage, due_at);
   `);
 }

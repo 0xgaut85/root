@@ -1,12 +1,13 @@
 /**
  * Public network trajectory.
  *
- * T0 = public opening (network_state.started_at). The network is scheduled to
- * reach the ceiling GROWTH_DAYS after T0, then keeps compounding slowly.
+ * T0 = public opening (network_state.started_at, set 3 days before launch of
+ * the dashboard via NETWORK_STARTED_AT). The network is scheduled to reach the
+ * ceiling GROWTH_DAYS after T0, then keeps compounding slowly.
  *
- *                 T0 (opening)              ceiling (T0 + 7 d)
- *   users              80          →             1,037
- *   gross USD         260          →            11,000
+ *                 T0 (opening)     dashboard launch (T0 + 3 d)     ceiling (T0 + 10 d)
+ *   users              80                    ≈285                        1,037
+ *   gross USD         260                  ≈1,400                       11,000
  *
  * The 80 contributors and $260 at T0 are the invited beta cohort and the one
  * day of deliveries they completed before the public opening; there is no
@@ -29,9 +30,9 @@
  * resets T0 (to NETWORK_STARTED_AT or now) and regenerates the stored samples.
  */
 
-export const CURVE_VERSION = 3;
+export const CURVE_VERSION = 4;
 export const HISTORY_DAYS = 0;
-export const GROWTH_DAYS = 7;
+export const GROWTH_DAYS = 10;
 export const DAY_MS = 86_400_000;
 
 export const USERS = { start: 80, ceiling: 1_037 };

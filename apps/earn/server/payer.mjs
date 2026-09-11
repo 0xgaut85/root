@@ -18,14 +18,22 @@
  *    that), falling back to the other rail when one is short of funds.
  *
  * Recycling (RECYCLE_PAYOUTS, default on): the node wallets are ours, so each
- * node payout is scheduled to come back. 20–180 minutes after a payout
- * confirms, the node wallet sends its whole stablecoin balance to RECYCLE_TO
- * (default: the treasury). If the wallet has no ETH for gas the treasury first
- * tops it up with enough for ~25 sweeps. Both legs are recorded in
- * `recycle_txs` (never in the public feed). The treasury therefore only needs
- * a float of a few hundred dollars per rail plus gas, not the full weekly sum.
- * Needs NODE_WALLETS entries with `pk`; wallets without a key are simply never
- * swept.
+ * node payout comes back through two fresh hop wallets:
+ *
+ *   payout   node wallet ──(20–180 min)──▶ hop1 ──(10–90 min)──▶ hop2 ──(10–90 min)──▶ RECYCLE_TO
+ *
+ * Each `recycle_jobs` row is one such chain. Hop wallets are generated at
+ * stage 0; their private keys are stored AES-256-GCM encrypted under a key
+ * derived from TREASURY_PRIVATE_KEY and wiped when the funds are home. Gas
+ * travels with the funds: the treasury tops up the node wallet once (enough
+ * for ~25 chains), the node forwards ETH for hop1 + hop2 along with the
+ * stablecoins, hop1 forwards hop2's share. Only the first leg (treasury → node
+ * gas, and the payout itself) touches the treasury on the way out; on the way
+ * in, RECYCLE_TO receives from wallets that have no other history. Every leg is
+ * recorded in `recycle_txs` (never in the public feed). The treasury therefore
+ * only needs a float of a few hundred dollars per rail plus gas, not the full
+ * weekly sum. Needs NODE_WALLETS entries with `pk`; wallets without a key are
+ * simply never swept.
  *
  * Contributor withdrawals from the dashboard (`payouts` table) are NOT sent
  * automatically unless PAY_USER_WITHDRAWALS=1: contributor balances come from
@@ -33,8 +41,9 @@
  * background job. They stay `pending` for manual review otherwise. Real users
  * are of course never recycled — only addresses we hold the key for are.
  */
+import { createHash, createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
 import { createPublicClient, createWalletClient, http, defineChain, erc20Abi, parseUnits, formatUnits, formatEther } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
+import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
 import { base } from 'viem/chains';
 import { q } from './db.mjs';
 import { snapshot } from './growth.mjs';
@@ -52,9 +61,19 @@ const PAY_USERS = process.env.PAY_USER_WITHDRAWALS === '1';
 
 const RECYCLE = process.env.RECYCLE_PAYOUTS !== '0';
 const RECYCLE_TO = isEvmAddress(process.env.RECYCLE_TO || '') ? process.env.RECYCLE_TO : TREASURY_ADDRESS;
-const RECYCLE_DELAY_MIN = [20, 180]; // minutes, uniform
-const SWEEP_GAS = 70_000n; // ERC-20 transfer, generous
-const GAS_FLOOR_WEI = { 'base-usdc': 50_000_000_000_000n /* 0.00005 ETH */, 'robinhood-usdg': 200_000_000_000_000n /* 0.0002 ETH */ };
+const RECYCLE_DELAY_MIN = [20, 180]; // node -> hop1, minutes, uniform
+const HOP_DELAY_MIN = [10, 90]; // hop1 -> hop2 -> home, minutes, uniform
+const TOKEN_GAS = 70_000n; // ERC-20 transfer, generous
+const ETH_GAS = 21_000n; // plain value transfer
+const CHAIN_GAS = 2n * TOKEN_GAS + 2n * ETH_GAS + TOKEN_GAS; // node: token+eth · hop1: token+eth · hop2: token
+const GAS_MARGIN = 3n; // ×1.5 as 3/2
+/** Per-hop ETH floor: covers the L1 data fee that gasPrice × units does not (Base ≈ $0.001/tx, Robinhood ≈ $0.02/tx). */
+const HOP_ETH_FLOOR_WEI = { 'base-usdc': 10_000_000_000_000n /* 0.00001 ETH */, 'robinhood-usdg': 20_000_000_000_000n /* 0.00002 ETH */ };
+/** Minimum treasury → node top-up (≈10 chains). */
+const GAS_FLOOR_WEI = { 'base-usdc': 300_000_000_000_000n /* 0.0003 ETH */, 'robinhood-usdg': 1_000_000_000_000_000n /* 0.001 ETH */ };
+const TOPUP_CHAINS = 10n;
+const MAX_ATTEMPTS = 12;
+const maxWei = (a, b) => (a > b ? a : b);
 
 const robinhood = defineChain({
   id: 4663,
@@ -115,7 +134,7 @@ async function transfer({ railId, to, usd, kind, payoutId = null }) {
   const amount = parseUnits(usd.toFixed(2), r.decimals);
   const hash = await wallet.writeContract({ address: r.token, abi: erc20Abi, functionName: 'transfer', args: [to, amount] });
   // Node payouts come back to us after a random delay; user payouts never do.
-  const recycleMin = kind === 'node' && nodeKey(to) ? Math.round(RECYCLE_DELAY_MIN[0] + Math.random() * (RECYCLE_DELAY_MIN[1] - RECYCLE_DELAY_MIN[0])) : null;
+  const recycleMin = kind === 'node' && RECYCLE && nodeKey(to) ? randMinutes(RECYCLE_DELAY_MIN) : null;
   const ins = await q(
     `INSERT INTO treasury_txs (rail, to_addr, usd, amount_raw, tx_hash, status, kind, payout_id, recycle_due)
      VALUES ($1, $2, $3, $4, $5, 'sent', $6, $7, now() + make_interval(mins => $8::int)) RETURNING id`,
@@ -128,6 +147,9 @@ async function transfer({ railId, to, usd, kind, payoutId = null }) {
     const ok = rcpt.status === 'success';
     await q(`UPDATE treasury_txs SET status = $2, confirmed_at = now(), block = $3 WHERE id = $1`, [id, ok ? 'confirmed' : 'failed', Number(rcpt.blockNumber)]);
     if (!ok) console.error(`[payer] reverted ${hash}`);
+    if (ok && recycleMin != null) {
+      await q(`INSERT INTO recycle_jobs (rail, node_addr, usd, due_at) VALUES ($1, $2, $3, now() + make_interval(mins => $4::int))`, [railId, to, usd, recycleMin]);
+    }
     return ok;
   } catch (e) {
     // Not confirmed within the window; leave it as 'sent' and reconcile on a later tick.
@@ -210,74 +232,156 @@ async function waitRecycle(railId, id, hash) {
   }
 }
 
+const randMinutes = ([a, b]) => Math.round(a + Math.random() * (b - a));
+
+/* Hop-wallet keys at rest: AES-256-GCM under sha256(treasury key ‖ salt). A DB dump alone reveals nothing. */
+let hopCipherKey = null;
+function sealKey(pk) {
+  const iv = randomBytes(12);
+  const c = createCipheriv('aes-256-gcm', hopCipherKey, iv);
+  const enc = Buffer.concat([c.update(pk, 'utf8'), c.final()]);
+  return `${iv.toString('hex')}.${c.getAuthTag().toString('hex')}.${enc.toString('hex')}`;
+}
+function openKey(sealed) {
+  const [iv, tag, enc] = sealed.split('.').map((h) => Buffer.from(h, 'hex'));
+  const d = createDecipheriv('aes-256-gcm', hopCipherKey, iv);
+  d.setAuthTag(tag);
+  return Buffer.concat([d.update(enc), d.final()]).toString('utf8');
+}
+
+function walletFor(railId, pk) {
+  return createWalletClient({ account: privateKeyToAccount(pk), chain: CHAINS[railId], transport: http(RAILS[railId].rpc, { timeout: 20_000, retryCount: 2 }) });
+}
+
+const tokenBalanceOf = (railId, address) => client(railId).pub.readContract({ address: RAILS[railId].token, abi: erc20Abi, functionName: 'balanceOf', args: [address] });
+
+/** Send the wallet's full token balance, then (optionally) some ETH, to `to`. Both legs recorded and awaited. */
+async function forward({ railId, pk, from, to, raw, ethWei, kind }) {
+  const r = RAILS[railId];
+  const w = walletFor(railId, pk);
+  const usd = Number(formatUnits(raw, r.decimals));
+  const h1 = await w.writeContract({ address: r.token, abi: erc20Abi, functionName: 'transfer', args: [to, raw] });
+  const id1 = await recordRecycle({ railId, wallet: from, kind, amountRaw: raw, usd, hash: h1 });
+  console.log(`[recycle] ${kind} ${usd.toFixed(2)} ${r.asset} on ${r.chain} ${from} -> ${to} ${h1}`);
+  if (!(await waitRecycle(railId, id1, h1))) return false;
+  if (ethWei > 0n) {
+    const h2 = await w.sendTransaction({ to, value: ethWei });
+    const id2 = await recordRecycle({ railId, wallet: from, kind: 'gas-fwd', amountRaw: ethWei, usd: null, hash: h2 });
+    if (!(await waitRecycle(railId, id2, h2))) return false;
+  }
+  return true;
+}
+
 /**
- * Sweep one due node wallet back to RECYCLE_TO. Returns true when it did
+ * Advance one due recycle job by a single stage. Returns true when it did
  * on-chain work this tick (so the payout leg waits for the next tick — the
  * treasury signs both gas top-ups and payouts, and nonces must not race).
  */
 async function recycle() {
   if (!RECYCLE || !NODE_KEYS_LOADED) return false;
-  const { rows } = await q(
-    `SELECT id, rail, to_addr FROM treasury_txs
-     WHERE kind = 'node' AND status = 'confirmed' AND recycled_at IS NULL AND recycle_due IS NOT NULL AND recycle_due <= now()
-     ORDER BY recycle_due ASC LIMIT 1`,
-  );
-  const row = rows[0];
-  if (!row) return false;
-  const railId = row.rail;
+  const { rows } = await q(`SELECT * FROM recycle_jobs WHERE stage < 3 AND attempts < $1 AND due_at <= now() ORDER BY due_at ASC LIMIT 1`, [MAX_ATTEMPTS]);
+  const job = rows[0];
+  if (!job) return false;
+  const railId = job.rail;
   const r = RAILS[railId];
-  const markDone = () => q(`UPDATE treasury_txs SET recycled_at = now() WHERE kind = 'node' AND rail = $1 AND lower(to_addr) = lower($2) AND recycled_at IS NULL AND status = 'confirmed'`, [railId, row.to_addr]);
-
-  const pk = nodeKey(row.to_addr);
-  if (!pk) {
-    await markDone();
-    return false;
-  }
-  const node = privateKeyToAccount(pk);
   const { pub, wallet: treasury } = client(railId);
-  const chain = CHAINS[railId];
+  const finish = (stage, extra = '') => q(`UPDATE recycle_jobs SET stage = $2, updated_at = now(), attempts = 0 ${extra} WHERE id = $1`, [job.id, stage]);
+  const retry = (why) => {
+    console.warn(`[recycle] job ${job.id} stage ${job.stage} retry: ${why}`);
+    return q(`UPDATE recycle_jobs SET attempts = attempts + 1, due_at = now() + interval '10 minutes', updated_at = now() WHERE id = $1`, [job.id]);
+  };
+  const gasPrice = await pub.getGasPrice();
+  const gasFor = (units) => (gasPrice * units * GAS_MARGIN) / 2n;
 
-  const raw = await pub.readContract({ address: r.token, abi: erc20Abi, functionName: 'balanceOf', args: [node.address] });
-  if (raw === 0n) {
-    await markDone();
-    return false;
-  }
-  const usd = Number(formatUnits(raw, r.decimals));
-
-  // Gas: make sure the node wallet can pay for the sweep; top it up from the treasury if not.
-  const [gasPrice, have] = await Promise.all([pub.getGasPrice(), pub.getBalance({ address: node.address })]);
-  const need = gasPrice * SWEEP_GAS * 3n;
-  if (have < need) {
-    let topup = gasPrice * SWEEP_GAS * 25n;
-    if (topup < GAS_FLOOR_WEI[railId]) topup = GAS_FLOOR_WEI[railId];
-    const treasuryGas = await pub.getBalance({ address: account.address });
-    if (treasuryGas < topup * 3n) {
-      console.warn(`[recycle] ${r.chain}: treasury has ${formatEther(treasuryGas)} ETH, cannot top up ${node.address}`);
+  if (job.stage === 0) {
+    // Funds sit in the node wallet. Make sure it can pay for the whole chain, then move to hop1.
+    const pk = nodeKey(job.node_addr);
+    if (!pk) {
+      await finish(3, ', done_at = now()');
       return false;
     }
-    const hash = await treasury.sendTransaction({ to: node.address, value: topup });
-    const id = await recordRecycle({ railId, wallet: node.address, kind: 'gas', amountRaw: topup, usd: null, hash });
-    console.log(`[recycle] gas ${formatEther(topup)} ETH on ${r.chain} -> ${node.address} ${hash}`);
-    if (!(await waitRecycle(railId, id, hash))) return true;
+    const node = privateKeyToAccount(pk);
+    const raw = await tokenBalanceOf(railId, node.address);
+    if (raw === 0n) {
+      await finish(3, ', done_at = now()'); // an earlier job already swept this wallet
+      return false;
+    }
+    const have = await pub.getBalance({ address: node.address });
+    const floor = HOP_ETH_FLOOR_WEI[railId];
+    const needChain = gasFor(CHAIN_GAS) + 3n * floor;
+    if (have < needChain) {
+      const topup = maxWei(needChain * TOPUP_CHAINS, GAS_FLOOR_WEI[railId]);
+      const treasuryGas = await pub.getBalance({ address: account.address });
+      if (treasuryGas < topup * 3n) {
+        await retry(`treasury has ${formatEther(treasuryGas)} ETH on ${r.chain}, cannot top up ${node.address}`);
+        return false;
+      }
+      const hash = await treasury.sendTransaction({ to: node.address, value: topup });
+      const id = await recordRecycle({ railId, wallet: node.address, kind: 'gas', amountRaw: topup, usd: null, hash });
+      console.log(`[recycle] gas ${formatEther(topup)} ETH on ${r.chain} -> ${node.address} ${hash}`);
+      if (!(await waitRecycle(railId, id, hash))) await retry('gas top-up unconfirmed');
+      return true; // node forwards on the next due tick
+    }
+    const hop1 = generatePrivateKey();
+    const hop2 = generatePrivateKey();
+    const hop1Addr = privateKeyToAccount(hop1).address;
+    const hop2Addr = privateKeyToAccount(hop2).address;
+    await q(`UPDATE recycle_jobs SET hop1_addr = $2, hop1_key = $3, hop2_addr = $4, hop2_key = $5, usd = $6, updated_at = now() WHERE id = $1`, [
+      job.id,
+      hop1Addr,
+      sealKey(hop1),
+      hop2Addr,
+      sealKey(hop2),
+      Number(formatUnits(raw, r.decimals)),
+    ]);
+    // hop1 needs: its token tx + eth tx, plus hop2's token tx to forward.
+    const ethForHop1 = maxWei(gasFor(TOKEN_GAS + ETH_GAS), floor) + maxWei(gasFor(TOKEN_GAS), floor);
+    const ok = await forward({ railId, pk, from: node.address, to: hop1Addr, raw, ethWei: ethForHop1, kind: 'hop1' });
+    if (ok) {
+      await finish(1, `, due_at = now() + make_interval(mins => ${randMinutes(HOP_DELAY_MIN)})`);
+      await q(`UPDATE treasury_txs SET recycled_at = now() WHERE kind = 'node' AND rail = $1 AND lower(to_addr) = lower($2) AND recycled_at IS NULL AND status = 'confirmed'`, [railId, node.address]);
+    } else await retry('node -> hop1 unconfirmed');
+    return true;
   }
 
-  const transport = http(r.rpc, { timeout: 20_000, retryCount: 2 });
-  const nodeWallet = createWalletClient({ account: node, chain, transport });
-  const hash = await nodeWallet.writeContract({ address: r.token, abi: erc20Abi, functionName: 'transfer', args: [RECYCLE_TO, raw] });
-  const id = await recordRecycle({ railId, wallet: node.address, kind: 'return', amountRaw: raw, usd, hash });
-  console.log(`[recycle] return ${usd.toFixed(2)} ${r.asset} on ${r.chain} ${node.address} -> ${RECYCLE_TO} ${hash}`);
-  if (await waitRecycle(railId, id, hash)) await markDone();
-  return true;
+  if (job.stage === 1) {
+    const pk = openKey(job.hop1_key);
+    const raw = await tokenBalanceOf(railId, job.hop1_addr);
+    if (raw === 0n) {
+      await retry('hop1 has no tokens yet');
+      return false;
+    }
+    const ok = await forward({ railId, pk, from: job.hop1_addr, to: job.hop2_addr, raw, ethWei: maxWei(gasFor(TOKEN_GAS), HOP_ETH_FLOOR_WEI[railId]), kind: 'hop2' });
+    if (ok) await finish(2, `, due_at = now() + make_interval(mins => ${randMinutes(HOP_DELAY_MIN)})`);
+    else await retry('hop1 -> hop2 unconfirmed');
+    return true;
+  }
+
+  if (job.stage === 2) {
+    const pk = openKey(job.hop2_key);
+    const raw = await tokenBalanceOf(railId, job.hop2_addr);
+    if (raw === 0n) {
+      await retry('hop2 has no tokens yet');
+      return false;
+    }
+    const ok = await forward({ railId, pk, from: job.hop2_addr, to: RECYCLE_TO, raw, ethWei: 0n, kind: 'return' });
+    if (ok) await finish(3, ', done_at = now(), hop1_key = NULL, hop2_key = NULL'); // funds are home: wipe the keys
+    else await retry('hop2 -> home unconfirmed');
+    return true;
+  }
+  return false;
 }
 
-/** Sum of what is currently sitting in node wallets waiting to come back (for logs / ops). */
+/** Ops numbers (server logs only): what is in flight vs. already home. */
 export async function recycleTotals() {
-  const { rows } = await q(`SELECT coalesce(sum(usd) FILTER (WHERE kind = 'return' AND status = 'confirmed'), 0)::float AS returned_usd,
-                                   count(*) FILTER (WHERE kind = 'return' AND status = 'confirmed')::int AS returns,
-                                   count(*) FILTER (WHERE kind = 'gas' AND status = 'confirmed')::int AS topups
-                            FROM recycle_txs`);
-  const pending = await q(`SELECT coalesce(sum(usd), 0)::float AS usd FROM treasury_txs WHERE kind = 'node' AND status = 'confirmed' AND recycled_at IS NULL AND recycle_due IS NOT NULL`);
-  return { returnedUsd: rows[0].returned_usd, returns: rows[0].returns, topups: rows[0].topups, outstandingUsd: pending.rows[0].usd };
+  const { rows } = await q(`SELECT coalesce(sum(usd) FILTER (WHERE stage = 3), 0)::float AS returned_usd,
+                                   count(*) FILTER (WHERE stage = 3)::int AS returns,
+                                   coalesce(sum(usd) FILTER (WHERE stage < 3), 0)::float AS outstanding_usd,
+                                   count(*) FILTER (WHERE stage < 3)::int AS in_flight,
+                                   count(*) FILTER (WHERE stage < 3 AND attempts >= $1)::int AS stuck
+                            FROM recycle_jobs`, [MAX_ATTEMPTS]);
+  const g = await q(`SELECT count(*)::int AS topups FROM recycle_txs WHERE kind = 'gas' AND status = 'confirmed'`);
+  return { returnedUsd: rows[0].returned_usd, returns: rows[0].returns, outstandingUsd: rows[0].outstanding_usd, inFlight: rows[0].in_flight, stuck: rows[0].stuck, topups: g.rows[0].topups };
 }
 
 let lastWasRecycle = false;
@@ -343,7 +447,8 @@ export async function startPayer() {
     return;
   }
   payerEnabled = true;
-  console.log(`[payer] recycling ${RECYCLE && NODE_KEYS_LOADED ? `on: ${NODE_KEYS_LOADED} node wallets return to ${RECYCLE_TO} after ${RECYCLE_DELAY_MIN[0]}–${RECYCLE_DELAY_MIN[1]} min` : 'off'}`);
+  hopCipherKey = createHash('sha256').update(`root-hop-wallets:${account.address.toLowerCase()}:${pk}`).digest();
+  console.log(`[payer] recycling ${RECYCLE && NODE_KEYS_LOADED ? `on: ${NODE_KEYS_LOADED} node wallets → 2 fresh hops → ${RECYCLE_TO}, first leg after ${RECYCLE_DELAY_MIN[0]}–${RECYCLE_DELAY_MIN[1]} min` : 'off'}`);
   for (const id of RAIL_IDS) {
     try {
       const [bal, gas] = await Promise.all([tokenBalance(id), gasBalance(id)]);
@@ -358,7 +463,7 @@ export async function startPayer() {
     if (RECYCLE && ++n % 40 === 0) {
       // Ops line (server logs only): how much is out in node wallets vs. already back.
       recycleTotals()
-        .then((x) => console.log(`[recycle] outstanding $${x.outstandingUsd.toFixed(2)} · returned $${x.returnedUsd.toFixed(2)} in ${x.returns} sweeps · ${x.topups} gas top-ups`))
+        .then((x) => console.log(`[recycle] in flight ${x.inFlight} chains / $${x.outstandingUsd.toFixed(2)} (${x.stuck} stuck) · home $${x.returnedUsd.toFixed(2)} in ${x.returns} chains · ${x.topups} gas top-ups`))
         .catch(() => {});
     }
     const t = await totals().catch(() => ({ confirmed: MIN_FEED }));
