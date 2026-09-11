@@ -42,7 +42,7 @@
  * are of course never recycled — only addresses we hold the key for are.
  */
 import { createHash, createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { createPublicClient, createWalletClient, http, defineChain, erc20Abi, parseUnits, formatUnits, formatEther } from 'viem';
+import { createPublicClient, createWalletClient, http, fallback, defineChain, erc20Abi, parseUnits, formatUnits, formatEther } from 'viem';
 import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
 import { base } from 'viem/chains';
 import { q } from './db.mjs';
@@ -90,10 +90,21 @@ const clients = {};
 let backoffUntil = 0;
 let sending = false;
 
+/** Extra public endpoints tried in order when the primary RPC fails (Base only has a rate-limited default). */
+const FALLBACK_RPCS = {
+  'base-usdc': ['https://base-rpc.publicnode.com', 'https://base.llamarpc.com', 'https://1rpc.io/base'],
+  'robinhood-usdg': [],
+};
+function transportFor(railId) {
+  const urls = [RAILS[railId].rpc, ...FALLBACK_RPCS[railId].filter((u) => u !== RAILS[railId].rpc)];
+  const list = urls.map((u) => http(u, { timeout: 20_000, retryCount: 1 }));
+  return list.length > 1 ? fallback(list, { rank: false }) : list[0];
+}
+
 function client(railId) {
   if (!clients[railId]) {
     const chain = CHAINS[railId];
-    const transport = http(RAILS[railId].rpc, { timeout: 20_000, retryCount: 2 });
+    const transport = transportFor(railId);
     clients[railId] = {
       pub: createPublicClient({ chain, transport }),
       wallet: createWalletClient({ account, chain, transport }),
@@ -233,6 +244,8 @@ async function waitRecycle(railId, id, hash) {
 }
 
 const randMinutes = ([a, b]) => Math.round(a + Math.random() * (b - a));
+const errText = (e) => [e.shortMessage || e.message, e.details, e.metaMessages?.[0]].filter(Boolean).join(' · ').slice(0, 300);
+const isRpcError = (e) => /RPC Request failed|HTTP request failed|timed out|fetch failed|429|503|rate limit/i.test(errText(e));
 
 /* Hop-wallet keys at rest: AES-256-GCM under sha256(treasury key ‖ salt). A DB dump alone reveals nothing. */
 let hopCipherKey = null;
@@ -250,7 +263,7 @@ function openKey(sealed) {
 }
 
 function walletFor(railId, pk) {
-  return createWalletClient({ account: privateKeyToAccount(pk), chain: CHAINS[railId], transport: http(RAILS[railId].rpc, { timeout: 20_000, retryCount: 2 }) });
+  return createWalletClient({ account: privateKeyToAccount(pk), chain: CHAINS[railId], transport: transportFor(railId) });
 }
 
 const tokenBalanceOf = (railId, address) => client(railId).pub.readContract({ address: RAILS[railId].token, abi: erc20Abi, functionName: 'balanceOf', args: [address] });
@@ -398,7 +411,7 @@ async function tick() {
     // Alternate: never two recycles in a row, so payouts keep flowing.
     if (!lastWasRecycle) {
       lastWasRecycle = await recycle().catch((e) => {
-        console.error('[recycle] failed:', e.shortMessage || e.message);
+        console.error('[recycle] failed:', errText(e));
         return false;
       });
       if (lastWasRecycle) return;
@@ -422,8 +435,9 @@ async function tick() {
     }
     await transfer({ railId, to, usd, kind: 'node' });
   } catch (e) {
-    console.error('[payer] tick failed:', e.shortMessage || e.message);
-    backoffUntil = Date.now() + 2 * 60_000;
+    console.error('[payer] tick failed:', errText(e));
+    // Transient RPC trouble: retry soon (during bootstrap every 25 s counts). Anything else: 2 minutes.
+    backoffUntil = Date.now() + (isRpcError(e) ? 20_000 : 2 * 60_000);
   } finally {
     sending = false;
   }
