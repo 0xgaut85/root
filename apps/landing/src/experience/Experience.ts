@@ -220,6 +220,35 @@ export class Experience {
     for (const c of this.chapters) c.init(this.ctx);
     // compile shaders up-front to avoid hitches on first transition
     for (const c of this.chapters) this.renderer.compile(c.scene, c.camera);
+
+    // Upload every texture to the GPU now. compile() only builds programs; textures are
+    // otherwise uploaded lazily on the first frame they are sampled, and the 4K plates
+    // (olive, olive_bloom, library) each take tens of ms plus mipmap generation. That
+    // upload used to land on the first frame of a transition — the hitch between chapters.
+    const seen = new Set<THREE.Texture>();
+    const upload = (v: unknown) => {
+      const t = v as THREE.Texture | undefined;
+      if (!t || !t.isTexture || seen.has(t)) return;
+      if ((t as THREE.VideoTexture).isVideoTexture || !t.image) return; // streamed later, nothing to upload yet
+      seen.add(t);
+      this.renderer.initTexture(t);
+    };
+    for (const a of this.ctx.assets.values()) upload(a);
+    const mapKeys = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap', 'alphaMap', 'envMap'];
+    for (const c of this.chapters) {
+      c.scene.traverse((o) => {
+        const m = (o as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+        for (const mat of Array.isArray(m) ? m : m ? [m] : []) {
+          const sm = mat as THREE.ShaderMaterial;
+          if (sm.uniforms) for (const u of Object.values(sm.uniforms)) upload(u.value);
+          for (const k of mapKeys) upload((mat as unknown as Record<string, unknown>)[k]);
+        }
+      });
+    }
+    // One warm-up frame per chapter into the off-screen target: creates the vertex arrays and
+    // uploads the GLB buffers while the loader is still on screen instead of mid-scroll.
+    for (const c of this.chapters) c.render(this.renderer, this.rtA);
+    this.renderer.setRenderTarget(null);
   }
 
   start() {
