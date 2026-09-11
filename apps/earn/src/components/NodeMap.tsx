@@ -26,6 +26,8 @@ const LAT_BOTTOM = -57;
 
 export type MapNode = {
   i: number;
+  /** Stable per (country, index) — survives nodes being added elsewhere. */
+  seed: number;
   id: string;
   lon: number;
   lat: number;
@@ -44,14 +46,16 @@ function buildNodes(regions: NetworkRegion[], activeNodes: number, bucket: numbe
   for (const r of regions) {
     const cities = CITIES[r.code];
     if (!cities) continue;
-    const total = cities.reduce((a, c) => a + c[3], 0);
+    // Squared weights: nodes cluster in the few big metros of a country rather than one per city.
+    const w = (c: (typeof cities)[number]) => c[3] * c[3];
+    const total = cities.reduce((a, c) => a + w(c), 0);
     for (let j = 0; j < r.nodes; j++, i++) {
       // Stable per (country, j): the j-th node of a country always lands in the same place.
       const seed = (r.code.charCodeAt(0) * 31 + r.code.charCodeAt(1)) * 4099 + j;
       let pick = hash(seed, 1) * total;
       let c = cities[cities.length - 1];
       for (const city of cities) {
-        pick -= city[3];
+        pick -= w(city);
         if (pick <= 0) {
           c = city;
           break;
@@ -63,24 +67,30 @@ function buildNodes(regions: NetworkRegion[], activeNodes: number, bucket: numbe
       const id = `node_${Math.floor(hash(seed, 4) * 0xffff)
         .toString(16)
         .padStart(4, '0')}`;
-      nodes.push({ i, id, lon, lat, code: r.code, country: r.name, continent: r.continent, city: c[0], online: false, mbps: 0 });
+      nodes.push({ i, seed, id, lon, lat, code: r.code, country: r.name, continent: r.continent, city: c[0], online: false, mbps: 0 });
     }
   }
 
-  // Exactly `activeNodes` are online. Score = stable per-node randomness per 5-minute bucket,
-  // nudged by local time of day so evenings light up region by region.
+  // Exactly `activeNodes` are online. Each node keeps its random "session score" for a
+  // ~3 h session (staggered per node, keyed by its stable seed — never by list position,
+  // so a new node appearing elsewhere does not reshuffle anyone), nudged by local time of
+  // day so evenings light up region by region. Only a handful of nodes change state per
+  // 5-minute bucket.
+  const SESSION_BUCKETS = 36; // 36 × 5 min = 3 h
   const scored = nodes.map((n) => {
     const localHour = (((bucket * 5) / 60 + n.lon / 15) % 24 + 24) % 24;
     const evening = Math.exp(-Math.pow((localHour - 20.5) / 4.5, 2)); // peak ~20:30 local
     const night = Math.exp(-Math.pow((localHour - 4) / 2.5, 2)); // trough ~04:00
-    return { n, s: hash(n.i, bucket) * 0.62 + evening * 0.38 - night * 0.25 };
+    const phase = Math.floor(hash(n.seed, 9) * SESSION_BUCKETS);
+    const session = Math.floor((bucket + phase) / SESSION_BUCKETS);
+    return { n, s: hash(n.seed, session) * 0.62 + evening * 0.38 - night * 0.25 };
   });
   scored.sort((a, b) => b.s - a.s);
   const k = Math.min(nodes.length, Math.max(0, activeNodes));
   for (let x = 0; x < scored.length; x++) {
     const n = scored[x].n;
     n.online = x < k;
-    n.mbps = n.online ? 0.15 + Math.pow(hash(n.i, bucket + 7), 2.2) * 3.6 : 0;
+    n.mbps = n.online ? 0.15 + Math.pow(hash(n.seed, bucket + 7), 2.2) * 3.6 : 0;
   }
   return nodes;
 }
