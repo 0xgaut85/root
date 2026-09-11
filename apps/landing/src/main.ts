@@ -20,37 +20,6 @@ const hudIndex = $('[data-hud-index]');
 const hudLabel = $('[data-hud-label]');
 const pill = $('[data-scroll-pill]');
 
-/* ---------------- "Coming soon" for the app / protocol links ---------------- */
-
-const soon = $('[data-soon]');
-const showSoon = () => {
-  soon.hidden = false;
-  requestAnimationFrame(() => soon.classList.add('is-open'));
-  $('[data-soon-close]').focus();
-};
-const hideSoon = () => {
-  soon.classList.remove('is-open');
-  setTimeout(() => (soon.hidden = true), 260);
-};
-document.addEventListener('click', (e) => {
-  const target = e.target as HTMLElement;
-  if (target.closest('[data-soon-close]') || (target.closest('[data-soon]') && !target.closest('.soon__card'))) {
-    e.preventDefault();
-    hideSoon();
-    return;
-  }
-  const a = target.closest<HTMLElement>('a[href], [data-soon-trigger]');
-  if (!a) return;
-  const href = a.getAttribute('href') || '';
-  if (a.hasAttribute('data-soon-trigger') || /earn\.rootnetwork\.co|read\.rootnetwork\.co/.test(href)) {
-    e.preventDefault();
-    showSoon();
-  }
-});
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && !soon.hidden) hideSoon();
-});
-
 /* ---------------- Experience (after the loader) ---------------- */
 
 let xpPromise: Promise<Experience> | null = null;
