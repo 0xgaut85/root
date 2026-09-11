@@ -406,7 +406,7 @@ let lastWasRecycle = false;
  * bootstrap burst (everything sent in the first BOOT_WINDOW) added up to.
  * Constant once the feed exists, so it is computed once.
  */
-const BOOT_WINDOW = '15 minutes';
+const BOOT_WINDOW = '20 minutes';
 let baselineCache = null;
 async function baseline(startedAt) {
   if (baselineCache) return baselineCache;
@@ -419,7 +419,7 @@ async function baseline(startedAt) {
     [first],
   );
   // Only freeze the baseline once the bootstrap window has closed.
-  if (Date.now() - first.getTime() < 16 * 60_000) return { bootUsd: boot.rows[0].usd, paidAtStart: snapshot(startedAt, first.getTime()).paidToContributorsUsd };
+  if (Date.now() - first.getTime() < 21 * 60_000) return { bootUsd: boot.rows[0].usd, paidAtStart: snapshot(startedAt, first.getTime()).paidToContributorsUsd };
   baselineCache = { bootUsd: boot.rows[0].usd, paidAtStart: snapshot(startedAt, first.getTime()).paidToContributorsUsd };
   console.log(`[payer] baseline: feed live since ${first.toISOString()}, bootstrap $${baselineCache.bootUsd.toFixed(2)} in ${boot.rows[0].n} txs, curve had paid $${baselineCache.paidAtStart.toFixed(0)}`);
   return baselineCache;
