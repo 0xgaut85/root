@@ -535,12 +535,19 @@ async function tick() {
     const b = await baseline(startedAt);
     const target = b.bootUsd + (s.paidToContributorsUsd - b.paidAtStart) * WITHDRAW_SHARE;
     const boot = t.confirmed < MIN_FEED;
-    if (!boot && t.usd + MIN_PAYOUT > target) return; // contributors have withdrawn as much as the curve says they would
 
+    // The next withdrawal's size is drawn once (seeded by the feed length, so it is stable across
+    // ticks) and goes out when the curve has accrued that much since the last one — so the feed
+    // keeps its $5–$60 spread instead of degrading into a string of $5 minimums. On a small network
+    // nobody has a $50 balance yet: cap at ~90 minutes of accrual.
     const seed = t.live + 1;
     const rnd = (k) => ((Math.sin(seed * 12.9898 + k * 78.233) * 43758.5453) % 1 + 1) % 1;
     let usd = round2(payoutSize(rnd(1)));
-    if (!boot) usd = round2(Math.max(MIN_PAYOUT, Math.min(usd, target - t.usd)));
+    if (!boot) {
+      const hourly = (s.paidToContributorsUsd - snapshot(startedAt, Date.now() - 3_600_000).paidToContributorsUsd) * WITHDRAW_SHARE;
+      usd = round2(Math.max(MIN_PAYOUT, Math.min(usd, hourly * 1.5)));
+      if (target - t.usd < usd) return; // not accrued yet
+    }
     const to = NODE_ADDRESSES[Math.floor(rnd(2) * NODE_ADDRESSES.length)];
     const railId = await fundedRail(pickRail(rnd(3)), usd);
     if (!railId) {
