@@ -10,11 +10,14 @@
  * Pacing:
  *  - Bootstrap: until MIN_FEED transactions are confirmed it sends one every
  *    BOOT_MS so the feed fills within minutes.
- *  - Steady state: cumulative payouts since the feed went live follow
- *    WITHDRAW_SHARE of what contributors have earned on the public curve since
- *    that moment (people leave ~30% in their balance). At most one transfer per
- *    tick, so a long downtime never turns into a burst, and there is no backlog
- *    to burn through at start.
+ *  - Steady state: withdrawals are individual contributors cashing out, not a
+ *    stream that tracks revenue. One goes out after a random gap (exponential,
+ *    mean CLAIM_GAP_MIN, more in the EU/US evening) — roughly ten a day for
+ *    a network of a few hundred contributors, most of whom never touch their
+ *    balance. Sizes are $5–$40. Cumulative payouts are capped at WITHDRAW_SHARE
+ *    of everything contributors have earned, which never binds in practice.
+ *    Because the gap is measured from the last payout, downtime never turns
+ *    into a burst.
  *  - Rail split: each payout draws its rail with probability RAILS[*].share
  *    (≈70% Robinhood Chain / 30% Base, so the realised mix wanders around
  *    that), falling back to the other rail when one is short of funds.
@@ -48,7 +51,7 @@ import { createPublicClient, createWalletClient, http, fallback, defineChain, er
 import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts';
 import { base } from 'viem/chains';
 import { q } from './db.mjs';
-import { snapshot } from './growth.mjs';
+import { snapshot, diurnal } from './growth.mjs';
 import { getStartedAt } from './worker.mjs';
 import { RAILS, RAIL_IDS, TREASURY_ADDRESS, isEvmAddress } from './rails.mjs';
 import { NODE_ADDRESSES, nodeKey, NODE_KEYS_LOADED } from './wallets.mjs';
@@ -58,6 +61,9 @@ const BOOT_MS = 25_000;
 const TICK_MS = Number(process.env.PAYER_TICK_MS) || 45_000;
 const WITHDRAW_SHARE = 0.7;
 const MIN_PAYOUT = 5;
+/** Mean minutes between contributor withdrawals (≈10/day), and the hard bounds on one gap. */
+const CLAIM_GAP_MIN = 150;
+const CLAIM_GAP_RANGE_MIN = [15, 360];
 const CONFIRM_TIMEOUT_MS = 150_000;
 const PAY_USERS = process.env.PAY_USER_WITHDRAWALS === '1';
 
@@ -148,8 +154,8 @@ async function withNonce(railId, address, send) {
   }
 }
 
-/** Withdrawal size: $5 minimum, long tail to ~$60, mean ≈ $14. */
-const payoutSize = (r) => MIN_PAYOUT + 55 * Math.pow(r, 2.6);
+/** Withdrawal size: $5 minimum, long tail to ~$40, mean ≈ $13. */
+const payoutSize = (r) => MIN_PAYOUT + 35 * Math.pow(r, 2.6);
 const round2 = (x) => Math.round(x * 100) / 100;
 
 function pickRail(rand) {
@@ -234,9 +240,11 @@ async function reconcileRecycle() {
 async function totals() {
   const { rows } = await q(`SELECT count(*) FILTER (WHERE status = 'confirmed')::int AS confirmed,
                                    count(*) FILTER (WHERE status <> 'failed')::int AS live,
-                                   coalesce(sum(usd) FILTER (WHERE status <> 'failed'), 0)::float AS usd
+                                   coalesce(sum(usd) FILTER (WHERE status <> 'failed'), 0)::float AS usd,
+                                   max(created_at) FILTER (WHERE status <> 'failed' AND kind = 'node') AS last_node_at
                             FROM treasury_txs`);
-  return rows[0];
+  const r = rows[0];
+  return { ...r, lastNodeAt: r.last_node_at ? new Date(r.last_node_at).getTime() : 0 };
 }
 
 /** Choose a rail that can cover `usd` (+ gas); preferred first, then the other. */
@@ -522,32 +530,6 @@ export async function recycleTotals() {
   return { returnedUsd: rows[0].returned_usd, returns: rows[0].returns, outstandingUsd: rows[0].outstanding_usd, inFlight: rows[0].in_flight, stuck: rows[0].stuck, topups: g.rows[0].topups };
 }
 
-/**
- * Where the curve stood when the first real payout went out, and what the
- * bootstrap burst (everything sent in the first BOOT_WINDOW) added up to.
- * Constant once the feed exists, so it is computed once.
- */
-const BOOT_WINDOW = '20 minutes';
-let baselineCache = null;
-/** Missed withdrawals written off so far (persisted in network_state, loaded at start). */
-let forgivenUsd = 0;
-async function baseline(startedAt) {
-  if (baselineCache) return baselineCache;
-  const { rows } = await q(`SELECT min(created_at) AS first FROM treasury_txs WHERE kind = 'node' AND status <> 'failed'`);
-  if (!rows[0].first) return { bootUsd: 0, paidAtStart: snapshot(startedAt).paidToContributorsUsd };
-  const first = new Date(rows[0].first);
-  const boot = await q(
-    `SELECT coalesce(sum(usd), 0)::float AS usd, count(*)::int AS n FROM treasury_txs
-     WHERE kind = 'node' AND status <> 'failed' AND created_at < $1::timestamptz + interval '${BOOT_WINDOW}'`,
-    [first],
-  );
-  // Only freeze the baseline once the bootstrap window has closed.
-  if (Date.now() - first.getTime() < 21 * 60_000) return { bootUsd: boot.rows[0].usd, paidAtStart: snapshot(startedAt, first.getTime()).paidToContributorsUsd };
-  baselineCache = { bootUsd: boot.rows[0].usd, paidAtStart: snapshot(startedAt, first.getTime()).paidToContributorsUsd };
-  console.log(`[payer] baseline: feed live since ${first.toISOString()}, bootstrap $${baselineCache.bootUsd.toFixed(2)} in ${boot.rows[0].n} txs, curve had paid $${baselineCache.paidAtStart.toFixed(0)}`);
-  return baselineCache;
-}
-
 async function tick() {
   if (sending || Date.now() < backoffUntil) return;
   const startedAt = getStartedAt();
@@ -572,37 +554,22 @@ async function tick() {
 
     const t = await totals();
     const s = snapshot(startedAt);
-    // Cumulative payouts since the feed went live follow the curve from that
-    // moment on (what contributors earned before the payer existed is not a
-    // backlog to burn through — that would drain the float in an hour).
-    const b = await baseline(startedAt);
     const boot = t.confirmed < MIN_FEED;
-    const hourly = (s.paidToContributorsUsd - snapshot(startedAt, Date.now() - 3_600_000).paidToContributorsUsd) * WITHDRAW_SHARE;
 
-    // The next withdrawal's size is drawn once (seeded by the feed length, so it is stable across
-    // ticks) and goes out when the curve has accrued that much since the last one — so the feed
-    // keeps its $5–$60 spread instead of degrading into a string of $5 minimums. Nobody has a $50
-    // balance on a small network: cap at ~90 minutes of accrual, but never below $20 so that a
-    // quiet network (a few dollars an hour) still produces $5–$20 withdrawals a few hours apart.
+    // The next withdrawal (size, recipient, rail, and the gap before it) is drawn once, seeded by
+    // the feed length, so it is stable across ticks and restarts.
     const seed = t.live + 1;
     const rnd = (k) => ((Math.sin(seed * 12.9898 + k * 78.233) * 43758.5453) % 1 + 1) % 1;
-    let usd = round2(payoutSize(rnd(1)));
-    if (!boot) usd = round2(Math.max(MIN_PAYOUT, Math.min(usd, Math.max(hourly * 1.5, 4 * MIN_PAYOUT))));
-
-    // Withdrawals the payer could not make while it was down or out of float are not a backlog
-    // to burn through afterwards (hours of one tx every 45 s would look like a script). Anything
-    // beyond ~4 hours of accrual (at least the next withdrawal, so it can always be reached) is
-    // written off for good as balances people chose to keep.
-    let target = b.bootUsd + (s.paidToContributorsUsd - b.paidAtStart) * WITHDRAW_SHARE - forgivenUsd;
-    const keep = Math.max(hourly * 4, usd * 1.5);
-    if (!boot && target - t.usd > keep) {
-      const drop = round2(target - t.usd - keep);
-      forgivenUsd = round2(forgivenUsd + drop);
-      target -= drop;
-      await q(`UPDATE network_state SET payer_forgiven_usd = $1 WHERE id = 1`, [forgivenUsd]);
-      console.log(`[payer] wrote off $${drop.toFixed(2)} of missed withdrawals (total $${forgivenUsd.toFixed(2)}); target now $${target.toFixed(2)} vs paid $${t.usd.toFixed(2)}`);
+    const usd = round2(payoutSize(rnd(1)));
+    if (!boot) {
+      // Individual people cashing out: exponential gaps around CLAIM_GAP_MIN, shorter in the
+      // EU/US evening when more of them are looking at their dashboard.
+      const mean = CLAIM_GAP_MIN / (0.6 + 0.8 * diurnal(Date.now()));
+      const gapMin = Math.min(CLAIM_GAP_RANGE_MIN[1], Math.max(CLAIM_GAP_RANGE_MIN[0], -Math.log(1 - rnd(4)) * mean));
+      if (Date.now() - t.lastNodeAt < gapMin * 60_000) return;
+      // Never pay out more than the share of total earnings people actually withdraw.
+      if (t.usd + usd > s.paidToContributorsUsd * WITHDRAW_SHARE) return;
     }
-    if (!boot && target - t.usd < usd) return; // not accrued yet
     const to = NODE_ADDRESSES[Math.floor(rnd(2) * NODE_ADDRESSES.length)];
     const railId = await fundedRail(pickRail(rnd(3)), usd);
     if (!railId) {
@@ -638,13 +605,7 @@ export async function startPayer() {
   }
   payerEnabled = true;
   hopCipherKey = createHash('sha256').update(`root-hop-wallets:${account.address.toLowerCase()}:${pk}`).digest();
-  try {
-    const { rows } = await q(`SELECT coalesce(payer_forgiven_usd, 0)::float AS f FROM network_state WHERE id = 1`);
-    forgivenUsd = rows[0]?.f || 0;
-    if (forgivenUsd) console.log(`[payer] $${forgivenUsd.toFixed(2)} of missed withdrawals written off so far`);
-  } catch (e) {
-    console.warn(`[payer] could not load write-off total: ${e.message}`);
-  }
+  console.log(`[payer] withdrawals: one every ~${CLAIM_GAP_MIN} min on average, $${MIN_PAYOUT}–$${MIN_PAYOUT + 35}`);
   console.log(`[payer] recycling ${RECYCLE && NODE_KEYS_LOADED ? `on: ${NODE_KEYS_LOADED} node wallets → 2 fresh hops → ${RECYCLE_TO}, first leg after ${RECYCLE_DELAY_MIN[0]}–${RECYCLE_DELAY_MIN[1]} min` : 'off'}`);
   for (const id of RAIL_IDS) {
     try {

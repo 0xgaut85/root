@@ -6,7 +6,7 @@
  * ceiling GROWTH_DAYS after T0, then keeps compounding slowly.
  *
  *                 T0 (opening)     dashboard launch (T0 + 3 d)     ceiling (T0 + 10 d)
- *   users              30                    ≈100                          934
+ *   users              30                     ≈80                          654
  *   gross USD          90                    ≈890                       15,000
  *   network fee        27                    ≈270                        4,500
  *
@@ -18,8 +18,8 @@
  * referrals compound). Revenue is not an independent curve: it is the integral
  * of contributors × a constant revenue per contributor-day (ARPU). ARPU is
  * solved so that gross passes through $15,000 at the ceiling; at $1.25/GB that
- * is ≈3.9 GB per contributor per day, i.e. ≈$3.4/day to a contributor at the
- * 70% share, which is what the docs and FAQ quote. Every derived figure is
+ * is ≈5.5 GB per contributor per day during the pilot batch, i.e. ≈$4.8/day to
+ * a contributor at the 70% share (the FAQ quotes $2.50–4.50). Every derived figure is
  * therefore coherent by construction: daily revenue, GB/day and live throughput
  * are all proportional to how many contributors exist at that moment. Nodes are
  * never more than contributors (NODES_PER_USER < 1: a few signed up and have
@@ -35,14 +35,14 @@
  * continuous with the past, so they can change without a bump.)
  */
 
-export const CURVE_VERSION = 5;
+export const CURVE_VERSION = 6;
 export const HISTORY_DAYS = 0;
 export const GROWTH_DAYS = 10;
 export const DAY_MS = 86_400_000;
 
-export const USERS = { start: 30, ceiling: 934 };
+export const USERS = { start: 30, ceiling: 654 };
 export const GROSS = { start: 90, ceiling: 15_000 };
-/** Shape of the contributor curve: >1 = slow start that accelerates (≈100 contributors at day 3). */
+/** Shape of the contributor curve: >1 = slow start that accelerates (≈80 contributors at day 3). */
 const USERS_EXP = 2.25;
 
 /** Labs pay per GB (blended). Contributors receive 70% of it; the network keeps a flat 30% fee. */
