@@ -255,11 +255,23 @@ async function fundedRail(preferred, usd) {
 }
 
 async function payUserWithdrawal() {
-  const { rows } = await q(`SELECT id, usd, wallet, rail FROM payouts WHERE status = 'pending' ORDER BY created_at ASC LIMIT 1`);
-  const p = rows[0];
-  if (!p || !isEvmAddress(p.wallet)) return false;
-  const railId = await fundedRail(RAILS[p.rail] ? p.rail : RAIL_IDS[0], Number(p.usd));
-  if (!railId) return false;
+  // Oldest first, but strictly on the rail the contributor chose: a Base USDC withdrawal must
+  // never arrive as USDG on Robinhood Chain. If that rail is short of float the request stays
+  // pending (and later ones on a funded rail still go out).
+  const { rows } = await q(`SELECT id, usd, wallet, rail FROM payouts WHERE status = 'pending' ORDER BY created_at ASC LIMIT 10`);
+  let p = null;
+  let railId = null;
+  for (const row of rows) {
+    if (!isEvmAddress(row.wallet) || !RAILS[row.rail]) continue;
+    const [bal, gas] = await Promise.all([tokenBalance(row.rail), gasBalance(row.rail)]);
+    if (bal >= Number(row.usd) && gas > 0.0002) {
+      p = row;
+      railId = row.rail;
+      break;
+    }
+    console.warn(`[payer] withdrawal #${row.id} ($${Number(row.usd).toFixed(2)} ${RAILS[row.rail].asset}) waits: ${RAILS[row.rail].chain} has ${bal.toFixed(2)} ${RAILS[row.rail].asset} / ${gas.toFixed(5)} ETH`);
+  }
+  if (!p) return false;
   await q(`UPDATE payouts SET status = 'processing' WHERE id = $1`, [p.id]);
   const ok = await transfer({ railId, to: p.wallet, usd: Number(p.usd), kind: 'user', payoutId: p.id });
   const tx = await q(`SELECT tx_hash FROM treasury_txs WHERE payout_id = $1 ORDER BY id DESC LIMIT 1`, [p.id]);
