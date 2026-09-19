@@ -11,13 +11,13 @@ const GB = 1e9;
 
 /**
  * Base daily demand per node at 100% allocation, before regional/seed variation.
- * Coherent with the public trajectory: the network moves ≈3.9 GB per contributor-day
- * (growth.mjs ARPU / lab rate) over ≈0.94 nodes of which ~65% are online at any hour,
- * i.e. ≈6 GB per online node-day at the mix of allocations people pick. A node
- * that stays online all day at a generous allocation earns ≈$3.5–5.5
- * (4–6.3 GB × $0.875); at the default 25% allocation ≈$2.2–3.4.
+ * Halved after the pilot batch of lab jobs finished (growth.mjs TAPER_AT): demand
+ * per node is now ≈2–3 GB/day. A node that stays online all day at a generous
+ * allocation earns ≈$1.75–2.75 (2–3.1 GB × $0.875); at the default 25% allocation
+ * ≈$1.1–1.7. Only affects traffic assigned from now on; hours already credited in
+ * `earnings` keep their value.
  */
-const BASE_DAILY_CAP_GB = 5;
+const BASE_DAILY_CAP_GB = 2.5;
 
 export function dailyCapBytes(device, allocation) {
   const seedMult = 0.8 + device.seed * 0.45; // 0.8x .. 1.25x per device

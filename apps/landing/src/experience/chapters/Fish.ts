@@ -51,7 +51,7 @@ export class Fish extends Chapter {
         <nav class="beat__footer" aria-label="Footer">
           <a href="https://read.rootnetwork.co">Protocol</a>
           <a href="https://earn.rootnetwork.co">App</a>
-          <a href="https://x.com/rootnetworkco" rel="noopener" target="_blank">X</a>
+          <a href="https://x.com/tryRootNetwork" rel="noopener" target="_blank">X</a>
           <a href="mailto:hello@rootnetwork.co">Contact</a>
           <span>\u00a9 ${new Date().getFullYear()} Root Network</span>
         </nav>`,

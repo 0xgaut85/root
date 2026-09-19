@@ -21,7 +21,7 @@ export default defineConfig({
     ['meta', { property: 'og:site_name', content: 'Root Network' }],
     ['meta', { property: 'og:image', content: 'https://read.rootnetwork.co/og.jpg' }],
     ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
-    ['meta', { name: 'twitter:site', content: '@rootnetworkco' }],
+    ['meta', { name: 'twitter:site', content: '@tryRootNetwork' }],
   ],
   themeConfig: {
     logo: { src: '/logo-white.png', alt: 'Root Network' },
@@ -88,7 +88,7 @@ export default defineConfig({
       },
     ],
     outline: { level: [2, 3], label: 'On this page' },
-    socialLinks: [{ icon: 'x', link: 'https://x.com/rootnetworkco' }],
+    socialLinks: [{ icon: 'x', link: 'https://x.com/tryRootNetwork' }],
     search: {
       provider: 'local',
       options: {

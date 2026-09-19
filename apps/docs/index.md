@@ -41,5 +41,5 @@ Sign in at [earn.rootnetwork.co](https://earn.rootnetwork.co), add the extension
 
 ## Community
 
-- [X / Twitter](https://x.com/rootnetworkco)
+- [X / Twitter](https://x.com/tryRootNetwork)
 - [rootnetwork.co](https://rootnetwork.co)

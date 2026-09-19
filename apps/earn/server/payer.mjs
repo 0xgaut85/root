@@ -567,29 +567,30 @@ async function tick() {
     const boot = t.confirmed < MIN_FEED;
     const hourly = (s.paidToContributorsUsd - snapshot(startedAt, Date.now() - 3_600_000).paidToContributorsUsd) * WITHDRAW_SHARE;
 
+    // The next withdrawal's size is drawn once (seeded by the feed length, so it is stable across
+    // ticks) and goes out when the curve has accrued that much since the last one — so the feed
+    // keeps its $5–$60 spread instead of degrading into a string of $5 minimums. Nobody has a $50
+    // balance on a small network: cap at ~90 minutes of accrual, but never below $20 so that a
+    // quiet network (a few dollars an hour) still produces $5–$20 withdrawals a few hours apart.
+    const seed = t.live + 1;
+    const rnd = (k) => ((Math.sin(seed * 12.9898 + k * 78.233) * 43758.5453) % 1 + 1) % 1;
+    let usd = round2(payoutSize(rnd(1)));
+    if (!boot) usd = round2(Math.max(MIN_PAYOUT, Math.min(usd, Math.max(hourly * 1.5, 4 * MIN_PAYOUT))));
+
     // Withdrawals the payer could not make while it was down or out of float are not a backlog
     // to burn through afterwards (hours of one tx every 45 s would look like a script). Anything
-    // beyond ~4 hours of accrual is written off for good as balances people chose to keep.
+    // beyond ~4 hours of accrual (at least the next withdrawal, so it can always be reached) is
+    // written off for good as balances people chose to keep.
     let target = b.bootUsd + (s.paidToContributorsUsd - b.paidAtStart) * WITHDRAW_SHARE - forgivenUsd;
-    if (!boot && target - t.usd > hourly * 4) {
-      const drop = round2(target - t.usd - hourly * 4);
+    const keep = Math.max(hourly * 4, usd * 1.5);
+    if (!boot && target - t.usd > keep) {
+      const drop = round2(target - t.usd - keep);
       forgivenUsd = round2(forgivenUsd + drop);
       target -= drop;
       await q(`UPDATE network_state SET payer_forgiven_usd = $1 WHERE id = 1`, [forgivenUsd]);
       console.log(`[payer] wrote off $${drop.toFixed(2)} of missed withdrawals (total $${forgivenUsd.toFixed(2)}); target now $${target.toFixed(2)} vs paid $${t.usd.toFixed(2)}`);
     }
-
-    // The next withdrawal's size is drawn once (seeded by the feed length, so it is stable across
-    // ticks) and goes out when the curve has accrued that much since the last one — so the feed
-    // keeps its $5–$60 spread instead of degrading into a string of $5 minimums. On a small network
-    // nobody has a $50 balance yet: cap at ~90 minutes of accrual.
-    const seed = t.live + 1;
-    const rnd = (k) => ((Math.sin(seed * 12.9898 + k * 78.233) * 43758.5453) % 1 + 1) % 1;
-    let usd = round2(payoutSize(rnd(1)));
-    if (!boot) {
-      usd = round2(Math.max(MIN_PAYOUT, Math.min(usd, hourly * 1.5)));
-      if (target - t.usd < usd) return; // not accrued yet
-    }
+    if (!boot && target - t.usd < usd) return; // not accrued yet
     const to = NODE_ADDRESSES[Math.floor(rnd(2) * NODE_ADDRESSES.length)];
     const railId = await fundedRail(pickRail(rnd(3)), usd);
     if (!railId) {

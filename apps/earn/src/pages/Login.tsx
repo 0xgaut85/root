@@ -41,8 +41,8 @@ export function Login() {
         <div className="login__foot">
           <a href="https://rootnetwork.co/privacy">Privacy</a>
           <a href="https://read.rootnetwork.co/data/acceptable-use">Terms</a>
-          <a href="https://x.com/rootnetworkco" target="_blank" rel="noopener">
-            @rootnetworkco
+          <a href="https://x.com/tryRootNetwork" target="_blank" rel="noopener">
+            @tryRootNetwork
           </a>
         </div>
       </div>

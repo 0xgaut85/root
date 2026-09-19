@@ -31,6 +31,8 @@
  *
  * Bump CURVE_VERSION whenever the curve constants change; the worker then
  * resets T0 (to NETWORK_STARTED_AT or now) and regenerates the stored samples.
+ * (Exception: the TAPER_* constants below only affect the future and are
+ * continuous with the past, so they can change without a bump.)
  */
 
 export const CURVE_VERSION = 5;
@@ -53,6 +55,21 @@ export const NODES_PER_USER = 0.94;
 
 /** After the ceiling, daily compounding of the contributor count. */
 const POST_CEILING_DAILY_GROWTH = 0.022;
+
+/**
+ * Demand plateau. The pilot batch of lab jobs that drove the first ten days
+ * finishes around TAPER_AT: from then on daily gross decays from whatever the
+ * curve's slope was at that instant to TAPER_FLOOR_PER_DAY (time constant
+ * TAPER_TAU_DAYS) and contributors compound at TAPER_DAILY_GROWTH instead of
+ * POST_CEILING_DAILY_GROWTH. Both series are continuous through TAPER_AT and
+ * every value before it is untouched, so this needs no CURVE_VERSION bump and
+ * restarts still never move a number. With the defaults, a week after the
+ * taper gross is up ≈12% (≈$2.4k) and contributors ≈1.5% (≈15).
+ */
+export const TAPER_AT = Date.parse('2026-09-19T08:30:00Z');
+const TAPER_FLOOR_PER_DAY = 140;
+const TAPER_TAU_DAYS = 0.3;
+const TAPER_DAILY_GROWTH = 0.0022;
 
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 const SPAN_DAYS = HISTORY_DAYS + GROWTH_DAYS;
@@ -95,12 +112,24 @@ export function progress(startedAtMs, nowMs) {
   return (nowMs - windowStart) / (SPAN_DAYS * DAY_MS); // may exceed 1 after the ceiling
 }
 
+/** Contributors (continuous) at a time, taper included. */
+function usersCont(startedAtMs, nowMs) {
+  if (nowMs <= TAPER_AT) return usersRaw(progress(startedAtMs, nowMs));
+  const u0 = usersRaw(progress(startedAtMs, TAPER_AT));
+  return u0 * Math.pow(1 + TAPER_DAILY_GROWTH, (nowMs - TAPER_AT) / DAY_MS);
+}
+
 export function usersAt(startedAtMs, nowMs) {
-  return Math.round(usersRaw(progress(startedAtMs, nowMs)));
+  return Math.round(usersCont(startedAtMs, nowMs));
 }
 
 export function grossAt(startedAtMs, nowMs) {
-  return GROSS_START + ARPU_PER_DAY * userDays(progress(startedAtMs, nowMs));
+  const pre = (t) => GROSS_START + ARPU_PER_DAY * userDays(progress(startedAtMs, t));
+  if (nowMs <= TAPER_AT) return pre(nowMs);
+  const g0 = pre(TAPER_AT);
+  const slope0 = ARPU_PER_DAY * usersRaw(progress(startedAtMs, TAPER_AT)); // d gross / d day just before the taper
+  const d = (nowMs - TAPER_AT) / DAY_MS;
+  return g0 + TAPER_FLOOR_PER_DAY * d + (slope0 - TAPER_FLOOR_PER_DAY) * TAPER_TAU_DAYS * (1 - Math.exp(-d / TAPER_TAU_DAYS));
 }
 
 export function gbAt(startedAtMs, nowMs) {

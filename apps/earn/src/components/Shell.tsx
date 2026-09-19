@@ -36,7 +36,7 @@ export function Shell() {
         <div className="sidebar__foot">
           <div className="sidebar__links">
             <a href="https://read.rootnetwork.co">Protocol</a>
-            <a href="https://x.com/rootnetworkco" target="_blank" rel="noopener">
+            <a href="https://x.com/tryRootNetwork" target="_blank" rel="noopener">
               X
             </a>
           </div>

@@ -1,6 +1,6 @@
 # X Article — Root Network
 
-**Post from:** @rootnetworkco (or founder account, then repost from the brand)
+**Post from:** @tryRootNetwork (or founder account, then repost from the brand)
 **Cover image:** the red/black grain gradient from the landing page with the R mark centered, 1600×900. No text on the image.
 **Inline images (optional, in this order):** `unused_assets/router6__ghost.png` (ghost router), the Data page node map screenshot, the Settings payout-rail screenshot.
 
@@ -113,7 +113,7 @@ Root Network is that. A network where the edge is your living room, the customer
 
 ## What to do now
 
-- If you have a home connection: go to **rootnetwork.co**, follow **@rootnetworkco**, and be first in line when the extension opens. Start with a low slider. Turn it off whenever you want.
+- If you have a home connection: go to **rootnetwork.co**, follow **@tryRootNetwork**, and be first in line when the extension opens. Start with a low slider. Turn it off whenever you want.
 - If you build datasets or run evaluations and cloud IPs keep handing you a broken copy of the web: we are an API with country targeting, receipts and a hard budget. Python and TypeScript clients. Talk to us.
 - If you are a website owner: named labs, public pages only, signed requests. You can finally tell a research crawl from an attack.
 
