@@ -177,8 +177,14 @@ body {
   height: 32px;
   line-height: 32px;
   margin-left: 8px;
+  /* the menu is a 64px flex row with align-items: normal; centre the pill in it */
+  align-self: center;
   font-weight: 500;
   transition: background 0.2s var(--rn-ease), transform 0.2s var(--rn-ease);
+}
+/* VitePress underlines the external-link icon pseudo-element; keep the pill clean */
+.VPNavBarMenu .VPNavBarMenuLink[href='https://earn.rootnetwork.co'].vp-external-link-icon::after {
+  display: none;
 }
 .VPNavBarMenu .VPNavBarMenuLink[href='https://earn.rootnetwork.co']:hover {
   background: #e8e8e8;
