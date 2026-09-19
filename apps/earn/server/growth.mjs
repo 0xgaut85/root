@@ -70,6 +70,15 @@ export const TAPER_AT = Date.parse('2026-09-19T08:30:00Z');
 const TAPER_FLOOR_PER_DAY = 140;
 const TAPER_TAU_DAYS = 0.3;
 const TAPER_DAILY_GROWTH = 0.0022;
+/**
+ * With less to relay, people stop leaving the extension on: the share of nodes
+ * online drifts from the pilot-era ~60% down to ONLINE_TAPER_FLOOR of that over
+ * a few days (time constant ONLINE_TAPER_TAU_DAYS). Nodes stay registered; they
+ * are just offline. This keeps the per-online-node throughput in the same range
+ * as before (≈1–1.5 GB per online node-day) instead of the live Mbps collapsing.
+ */
+const ONLINE_TAPER_FLOOR = 0.2;
+const ONLINE_TAPER_TAU_DAYS = 1.5;
 
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 const SPAN_DAYS = HISTORY_DAYS + GROWTH_DAYS;
@@ -160,11 +169,18 @@ export function diurnal(nowMs) {
   return clamp01(0.35 + 0.65 * Math.min(1, eu + us));
 }
 
+/** 1 until TAPER_AT, then decays towards ONLINE_TAPER_FLOOR. */
+function onlineFactor(nowMs) {
+  if (nowMs <= TAPER_AT) return 1;
+  const d = (nowMs - TAPER_AT) / DAY_MS;
+  return ONLINE_TAPER_FLOOR + (1 - ONLINE_TAPER_FLOOR) * Math.exp(-d / ONLINE_TAPER_TAU_DAYS);
+}
+
 export function activeNodesAt(startedAtMs, nowMs) {
   const nodes = nodesAt(startedAtMs, nowMs);
   const bucket = Math.floor(nowMs / 300_000);
   const jitter = (noise(bucket, 7) - 0.5) * 0.06;
-  const share = clamp01(0.52 + 0.24 * diurnal(nowMs) + jitter);
+  const share = clamp01((0.52 + 0.24 * diurnal(nowMs)) * onlineFactor(nowMs) + jitter * onlineFactor(nowMs));
   return Math.max(1, Math.round(nodes * share));
 }
 
