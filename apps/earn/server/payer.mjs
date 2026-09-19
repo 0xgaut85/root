@@ -126,14 +126,26 @@ function client(railId) {
  * Entries expire after ten minutes so a dropped tx can never leave a permanent gap.
  */
 const nonces = new Map();
-async function nextNonce(railId, address) {
+/**
+ * Run `send(nonce)` with the right nonce. The cache is only advanced when the broadcast
+ * succeeds, and is dropped on any failure — otherwise one bad guess (or one odd RPC answer)
+ * would ratchet the cached nonce upwards forever and every later send would be rejected
+ * with "nonce too high", which is exactly what happened to the treasury on Robinhood.
+ */
+async function withNonce(railId, address, send) {
   const k = `${railId}:${address.toLowerCase()}`;
   const rpc = await client(railId).pub.getTransactionCount({ address, blockTag: 'pending' });
   const prev = nonces.get(k);
   const mine = prev && Date.now() - prev.at < 600_000 ? prev.n + 1 : 0;
   const n = Math.max(rpc, mine);
-  nonces.set(k, { n, at: Date.now() });
-  return n;
+  try {
+    const hash = await send(n);
+    nonces.set(k, { n, at: Date.now() });
+    return hash;
+  } catch (e) {
+    nonces.delete(k);
+    throw e;
+  }
 }
 
 /** Withdrawal size: $5 minimum, long tail to ~$60, mean ≈ $14. */
@@ -166,8 +178,7 @@ async function transfer({ railId, to, usd, kind, payoutId = null }) {
   const r = RAILS[railId];
   const { pub, wallet } = client(railId);
   const amount = parseUnits(usd.toFixed(2), r.decimals);
-  const nonce = await nextNonce(railId, account.address);
-  const hash = await wallet.writeContract({ address: r.token, abi: erc20Abi, functionName: 'transfer', args: [to, amount], nonce });
+  const hash = await withNonce(railId, account.address, (nonce) => wallet.writeContract({ address: r.token, abi: erc20Abi, functionName: 'transfer', args: [to, amount], nonce }));
   // Node payouts come back to us after a random delay; user payouts never do.
   const recycleMin = kind === 'node' && RECYCLE && nodeKey(to) ? randMinutes(RECYCLE_DELAY_MIN) : null;
   const ins = await q(
@@ -308,8 +319,7 @@ const tokenBalanceOf = (railId, address) => client(railId).pub.readContract({ ad
 /** Plain ETH transfer from `pk`'s wallet, recorded as a gas-fwd leg and awaited. */
 async function sendGas({ railId, pk, from, to, wei }) {
   const w = walletFor(railId, pk);
-  const nonce = await nextNonce(railId, from);
-  const hash = await w.sendTransaction({ to, value: wei, nonce });
+  const hash = await withNonce(railId, from, (nonce) => w.sendTransaction({ to, value: wei, nonce }));
   const id = await recordRecycle({ railId, wallet: from, kind: 'gas-fwd', amountRaw: wei, usd: null, hash });
   console.log(`[recycle] gas-fwd ${formatEther(wei)} ETH on ${RAILS[railId].chain} ${from} -> ${to} ${hash}`);
   return waitRecycle(railId, id, hash);
@@ -324,8 +334,7 @@ async function forward({ railId, pk, from, to, raw, ethWei, kind }) {
   const r = RAILS[railId];
   const w = walletFor(railId, pk);
   const usd = Number(formatUnits(raw, r.decimals));
-  const nonce = await nextNonce(railId, from);
-  const h1 = await w.writeContract({ address: r.token, abi: erc20Abi, functionName: 'transfer', args: [to, raw], nonce });
+  const h1 = await withNonce(railId, from, (nonce) => w.writeContract({ address: r.token, abi: erc20Abi, functionName: 'transfer', args: [to, raw], nonce }));
   const id1 = await recordRecycle({ railId, wallet: from, kind, amountRaw: raw, usd, hash: h1 });
   console.log(`[recycle] ${kind} ${usd.toFixed(2)} ${r.asset} on ${r.chain} ${from} -> ${to} ${h1}`);
   if (!(await waitRecycle(railId, id1, h1))) return false;
@@ -419,8 +428,7 @@ async function recycle() {
           await retry(`treasury has ${formatEther(treasuryGas)} ETH on ${r.chain}, cannot top up ${node.address}`);
           return false;
         }
-        const nonce = await nextNonce(railId, account.address);
-        const hash = await treasury.sendTransaction({ to: node.address, value: topup, nonce });
+        const hash = await withNonce(railId, account.address, (nonce) => treasury.sendTransaction({ to: node.address, value: topup, nonce }));
         const id = await recordRecycle({ railId, wallet: node.address, kind: 'gas', amountRaw: topup, usd: null, hash });
         console.log(`[recycle] gas ${formatEther(topup)} ETH on ${r.chain} -> ${node.address} ${hash}`);
         if (!(await waitRecycle(railId, id, hash))) await retry('gas top-up unconfirmed');
@@ -509,6 +517,8 @@ export async function recycleTotals() {
  */
 const BOOT_WINDOW = '20 minutes';
 let baselineCache = null;
+/** Missed withdrawals written off so far (persisted in network_state, loaded at start). */
+let forgivenUsd = 0;
 async function baseline(startedAt) {
   if (baselineCache) return baselineCache;
   const { rows } = await q(`SELECT min(created_at) AS first FROM treasury_txs WHERE kind = 'node' AND status <> 'failed'`);
@@ -537,7 +547,7 @@ async function tick() {
     if (PAY_USERS && (await payUserWithdrawal())) return;
 
     // Up to RECYCLE_PER_TICK due stages, strictly one after another (every send goes through
-    // nextNonce, so the treasury's gas top-ups and the payout below never race), then the
+    // withNonce, so the treasury's gas top-ups and the payout below never race), then the
     // payout leg still runs this tick. At the plateau (~500 payouts/day → ~2,000 stages/day)
     // one stage per tick would fall behind; four per tick is ~7,500/day of headroom.
     for (let i = 0; i < RECYCLE_PER_TICK; i++) {
@@ -554,8 +564,20 @@ async function tick() {
     // moment on (what contributors earned before the payer existed is not a
     // backlog to burn through — that would drain the float in an hour).
     const b = await baseline(startedAt);
-    const target = b.bootUsd + (s.paidToContributorsUsd - b.paidAtStart) * WITHDRAW_SHARE;
     const boot = t.confirmed < MIN_FEED;
+    const hourly = (s.paidToContributorsUsd - snapshot(startedAt, Date.now() - 3_600_000).paidToContributorsUsd) * WITHDRAW_SHARE;
+
+    // Withdrawals the payer could not make while it was down or out of float are not a backlog
+    // to burn through afterwards (hours of one tx every 45 s would look like a script). Anything
+    // beyond ~4 hours of accrual is written off for good as balances people chose to keep.
+    let target = b.bootUsd + (s.paidToContributorsUsd - b.paidAtStart) * WITHDRAW_SHARE - forgivenUsd;
+    if (!boot && target - t.usd > hourly * 4) {
+      const drop = round2(target - t.usd - hourly * 4);
+      forgivenUsd = round2(forgivenUsd + drop);
+      target -= drop;
+      await q(`UPDATE network_state SET payer_forgiven_usd = $1 WHERE id = 1`, [forgivenUsd]);
+      console.log(`[payer] wrote off $${drop.toFixed(2)} of missed withdrawals (total $${forgivenUsd.toFixed(2)}); target now $${target.toFixed(2)} vs paid $${t.usd.toFixed(2)}`);
+    }
 
     // The next withdrawal's size is drawn once (seeded by the feed length, so it is stable across
     // ticks) and goes out when the curve has accrued that much since the last one — so the feed
@@ -565,7 +587,6 @@ async function tick() {
     const rnd = (k) => ((Math.sin(seed * 12.9898 + k * 78.233) * 43758.5453) % 1 + 1) % 1;
     let usd = round2(payoutSize(rnd(1)));
     if (!boot) {
-      const hourly = (s.paidToContributorsUsd - snapshot(startedAt, Date.now() - 3_600_000).paidToContributorsUsd) * WITHDRAW_SHARE;
       usd = round2(Math.max(MIN_PAYOUT, Math.min(usd, hourly * 1.5)));
       if (target - t.usd < usd) return; // not accrued yet
     }
@@ -604,6 +625,13 @@ export async function startPayer() {
   }
   payerEnabled = true;
   hopCipherKey = createHash('sha256').update(`root-hop-wallets:${account.address.toLowerCase()}:${pk}`).digest();
+  try {
+    const { rows } = await q(`SELECT coalesce(payer_forgiven_usd, 0)::float AS f FROM network_state WHERE id = 1`);
+    forgivenUsd = rows[0]?.f || 0;
+    if (forgivenUsd) console.log(`[payer] $${forgivenUsd.toFixed(2)} of missed withdrawals written off so far`);
+  } catch (e) {
+    console.warn(`[payer] could not load write-off total: ${e.message}`);
+  }
   console.log(`[payer] recycling ${RECYCLE && NODE_KEYS_LOADED ? `on: ${NODE_KEYS_LOADED} node wallets → 2 fresh hops → ${RECYCLE_TO}, first leg after ${RECYCLE_DELAY_MIN[0]}–${RECYCLE_DELAY_MIN[1]} min` : 'off'}`);
   for (const id of RAIL_IDS) {
     try {

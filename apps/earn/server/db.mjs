@@ -127,6 +127,7 @@ export async function migrate() {
     CREATE INDEX IF NOT EXISTS treasury_txs_created ON treasury_txs(created_at DESC);
 
     -- v4: node wallets return their payouts to the treasury after a random delay (see payer.mjs)
+    ALTER TABLE network_state ADD COLUMN IF NOT EXISTS payer_forgiven_usd numeric NOT NULL DEFAULT 0;
     ALTER TABLE treasury_txs ADD COLUMN IF NOT EXISTS recycle_due timestamptz;
     ALTER TABLE treasury_txs ADD COLUMN IF NOT EXISTS recycled_at timestamptz;
     CREATE TABLE IF NOT EXISTS recycle_txs (
