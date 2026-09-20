@@ -39,8 +39,15 @@ export type MapNode = {
   mbps: number;
 };
 
-/** Build the node list from region counts. Stable for a given (regions, bucket). */
-function buildNodes(regions: NetworkRegion[], activeNodes: number, bucket: number): MapNode[] {
+/** Wall-clock tick the map advances on; each tick a node or two may change state. */
+const TICK_MS = 10_000;
+/** A node keeps its "session score" for ~3 h, so it stays online (or offline) for hours, not minutes. */
+const SESSION_S = 3 * 3600;
+/** Colour cross-fade when a dot changes state. */
+const FADE_MS = 1400;
+
+/** Build the node list from region counts. Stable for a given (regions, activeNodes, time). */
+function buildNodes(regions: NetworkRegion[], activeNodes: number, tSec: number): MapNode[] {
   const nodes: MapNode[] = [];
   let i = 0;
   for (const r of regions) {
@@ -72,25 +79,26 @@ function buildNodes(regions: NetworkRegion[], activeNodes: number, bucket: numbe
   }
 
   // Exactly `activeNodes` are online. Each node keeps its random "session score" for a
-  // ~3 h session (staggered per node, keyed by its stable seed — never by list position,
-  // so a new node appearing elsewhere does not reshuffle anyone), nudged by local time of
-  // day so evenings light up region by region. Only a handful of nodes change state per
-  // 5-minute bucket.
-  const SESSION_BUCKETS = 36; // 36 × 5 min = 3 h
+  // ~3 h session whose boundaries are staggered per node (keyed by its stable seed — never by
+  // list position, so a new node appearing elsewhere does not reshuffle anyone), nudged by
+  // local time of day so evenings light up region by region. Because sessions roll over at
+  // different seconds for different nodes, state changes trickle in one or two at a time
+  // instead of a batch every five minutes.
   const scored = nodes.map((n) => {
-    const localHour = (((bucket * 5) / 60 + n.lon / 15) % 24 + 24) % 24;
+    const localHour = (((tSec / 3600 + n.lon / 15) % 24) + 24) % 24;
     const evening = Math.exp(-Math.pow((localHour - 20.5) / 4.5, 2)); // peak ~20:30 local
     const night = Math.exp(-Math.pow((localHour - 4) / 2.5, 2)); // trough ~04:00
-    const phase = Math.floor(hash(n.seed, 9) * SESSION_BUCKETS);
-    const session = Math.floor((bucket + phase) / SESSION_BUCKETS);
+    const phase = Math.floor(hash(n.seed, 9) * SESSION_S);
+    const session = Math.floor((tSec + phase) / SESSION_S);
     return { n, s: hash(n.seed, session) * 0.62 + evening * 0.38 - night * 0.25 };
   });
   scored.sort((a, b) => b.s - a.s);
   const k = Math.min(nodes.length, Math.max(0, activeNodes));
+  const minute = Math.floor(tSec / 60);
   for (let x = 0; x < scored.length; x++) {
     const n = scored[x].n;
     n.online = x < k;
-    n.mbps = n.online ? 0.15 + Math.pow(hash(n.seed, bucket + 7), 2.2) * 3.6 : 0;
+    n.mbps = n.online ? 0.15 + Math.pow(hash(n.seed, minute + 7), 2.2) * 3.6 : 0;
   }
   return nodes;
 }
@@ -113,8 +121,43 @@ export function NodeMap({ regions, continents, activeNodes, nodes: nodeCount }: 
   const [focus, setFocus] = useState<Continent | null>(null);
   const [filter, setFilter] = useState<Continent | null>(null);
 
-  const bucket = Math.floor(Date.now() / 300_000);
-  const mapNodes = useMemo(() => buildNodes(regions, activeNodes, bucket), [regions, activeNodes, bucket]);
+  // The map advances on its own clock (every TICK_MS), independent of the API poll.
+  const [tick, setTick] = useState(() => Math.floor(Date.now() / TICK_MS));
+  useEffect(() => {
+    const id = setInterval(() => setTick(Math.floor(Date.now() / TICK_MS)), TICK_MS);
+    return () => clearInterval(id);
+  }, []);
+  const tSec = (tick * TICK_MS) / 1000;
+
+  // The server's online count moves in steps every five minutes; the map eases towards it a
+  // node or two per tick, so dots come and go continuously rather than all at once.
+  const shownRef = useRef<number | null>(null);
+  const shown = useMemo(() => {
+    const prev = shownRef.current;
+    let next = activeNodes;
+    if (prev !== null && prev !== activeNodes) {
+      const diff = activeNodes - prev;
+      const step = Math.max(1, Math.ceil(Math.abs(diff) / 6)); // converges within about a minute
+      next = Math.abs(diff) <= step ? activeNodes : prev + Math.sign(diff) * step;
+    }
+    shownRef.current = next;
+    return next;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeNodes, tick]);
+
+  const mapNodes = useMemo(() => buildNodes(regions, shown, tSec), [regions, shown, tSec]);
+
+  // Remember when each node last changed state so the dot can cross-fade.
+  const stateRef = useRef(new Map<number, { online: boolean; at: number }>());
+  useEffect(() => {
+    const now = performance.now();
+    const m = stateRef.current;
+    for (const n of mapNodes) {
+      const prev = m.get(n.seed);
+      if (!prev) m.set(n.seed, { online: n.online, at: 0 });
+      else if (prev.online !== n.online) m.set(n.seed, { online: n.online, at: now });
+    }
+  }, [mapNodes]);
 
   const land = useMemo(() => {
     const topo = land110 as unknown as Topology<{ land: GeometryCollection }>;
@@ -209,15 +252,26 @@ export function NodeMap({ regions, continents, activeNodes, nodes: nodeCount }: 
 
       const f = focusRef.current;
       const rDot = Math.max(1.6, size.w / 520);
-      // Offline first (underneath), then online.
+      const now = performance.now();
+      const states = stateRef.current;
+      // Offline first (underneath), then online. A dot that just changed state cross-fades
+      // between the two colours over FADE_MS (no pulsing, just a soft switch).
       for (const pass of [false, true]) {
         for (const p of projected) {
           if (p.n.online !== pass) continue;
           const dim = f && p.n.continent !== f;
-          ctx.globalAlpha = dim ? 0.12 : pass ? 0.95 : 0.6;
-          ctx.fillStyle = pass ? '#22c55e' : '#e5484d';
+          const st = states.get(p.n.seed);
+          const age = st && st.at ? now - st.at : Infinity;
+          const mix = age < FADE_MS ? age / FADE_MS : 1; // 0 = old colour, 1 = new colour
+          const g = pass ? mix : 1 - mix; // how green the dot is
+          const rr = Math.round(0xe5 + (0x22 - 0xe5) * g);
+          const gg = Math.round(0x48 + (0xc5 - 0x48) * g);
+          const bb = Math.round(0x4d + (0x5e - 0x4d) * g);
+          const alpha = 0.6 + 0.35 * g;
+          ctx.globalAlpha = dim ? 0.12 : alpha;
+          ctx.fillStyle = `rgb(${rr},${gg},${bb})`;
           ctx.beginPath();
-          ctx.arc(p.x, p.y, pass ? rDot : rDot * 0.85, 0, Math.PI * 2);
+          ctx.arc(p.x, p.y, rDot * (0.85 + 0.15 * g), 0, Math.PI * 2);
           ctx.fill();
         }
       }
@@ -316,7 +370,7 @@ export function NodeMap({ regions, continents, activeNodes, nodes: nodeCount }: 
         <span>
           <i style={{ background: '#e5484d' }} /> {(nodeCount - onlineCount).toLocaleString()} offline
         </span>
-        <span className="map__foot-r">One dot per node · placed by metro area · updates every 5 min</span>
+        <span className="map__foot-r">One dot per node · placed by metro area · live</span>
       </div>
     </div>
   );
