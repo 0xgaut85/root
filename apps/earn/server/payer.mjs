@@ -105,7 +105,7 @@ let sending = false;
 /** Extra public endpoints tried in order when the primary RPC fails (Base only has a rate-limited default). */
 const FALLBACK_RPCS = {
   'base-usdc': ['https://base-rpc.publicnode.com', 'https://base.llamarpc.com', 'https://1rpc.io/base'],
-  'robinhood-usdg': [],
+  'robinhood-usdg': ['https://robinhood.drpc.org'], // the official endpoint sits behind Cloudflare and rate-limits (429 / 403 challenge pages)
 };
 function transportFor(railId) {
   const urls = [RAILS[railId].rpc, ...FALLBACK_RPCS[railId].filter((u) => u !== RAILS[railId].rpc)];
@@ -205,7 +205,7 @@ async function transfer({ railId, to, usd, kind, payoutId = null }) {
     return ok;
   } catch (e) {
     // Not confirmed within the window; leave it as 'sent' and reconcile on a later tick.
-    console.warn(`[payer] receipt pending for ${hash}: ${e.message}`);
+    console.warn(`[payer] receipt pending for ${hash}: ${errText(e)}`);
     return true;
   }
 }
@@ -306,7 +306,7 @@ async function waitRecycle(railId, id, hash) {
     await q(`UPDATE recycle_txs SET status = $2, confirmed_at = now() WHERE id = $1`, [id, ok ? 'confirmed' : 'failed']);
     return ok;
   } catch (e) {
-    console.warn(`[recycle] receipt pending for ${hash}: ${e.message}`);
+    console.warn(`[recycle] receipt pending for ${hash}: ${errText(e)}`);
     return false;
   }
 }
@@ -487,7 +487,12 @@ async function recycle() {
       const pk = openKey(job.hop1_key);
       const raw = await tokenBalanceOf(railId, job.hop1_addr);
       if (raw === 0n) {
-        await retry('hop1 has no tokens yet');
+        // Either the tokens have not reached hop1 yet, or a previous attempt already pushed them
+        // to hop2 and lost the receipt (RPC blip) — in which case carry on from hop2.
+        if ((await tokenBalanceOf(railId, job.hop2_addr)) > 0n) {
+          console.log(`[recycle] job ${job.id}: hop1 -> hop2 had landed after all, advancing`);
+          await finish(2, `, due_at = now() + make_interval(mins => ${randMinutes(HOP_DELAY_MIN)})`);
+        } else await retry('hop1 has no tokens yet');
         return false;
       }
       // hop1 signs a token tx and an eth tx; if the node's gas-fwd never landed, the node pays it now
@@ -504,7 +509,12 @@ async function recycle() {
       const pk = openKey(job.hop2_key);
       const raw = await tokenBalanceOf(railId, job.hop2_addr);
       if (raw === 0n) {
-        await retry('hop2 has no tokens yet');
+        // Same as stage 1: the return may already be on-chain with its receipt lost.
+        const home = await q(`SELECT 1 FROM recycle_txs WHERE kind = 'return' AND lower(wallet) = lower($1) AND status = 'confirmed' LIMIT 1`, [job.hop2_addr]);
+        if (home.rowCount) {
+          console.log(`[recycle] job ${job.id}: return had landed after all, closing`);
+          await finish(3, ', done_at = now(), hop1_key = NULL, hop2_key = NULL');
+        } else await retry('hop2 has no tokens yet');
         return false;
       }
       const need = maxWei(gasFor(TOKEN_GAS), HOP_ETH_FLOOR_WEI[railId]);
