@@ -112,16 +112,20 @@ ext.post('/heartbeat', requireDevice, async (req, res) => {
   const u = await q('SELECT allocation FROM users WHERE id = $1', [d.user_id]);
   const effAlloc = allocation ?? u.rows[0]?.allocation ?? 25;
 
+  // Today's bytes for this device and for the whole account (all device ids, including ones
+  // since unpaired — re-pairing must not reset anyone's daily budget).
   const today = await q(
-    `SELECT coalesce(sum(bytes),0) AS bytes FROM earnings WHERE device_id = $1 AND hour >= date_trunc('day', now())`,
-    [d.id],
+    `SELECT coalesce(sum(bytes) FILTER (WHERE device_id = $2), 0) AS dev, coalesce(sum(bytes), 0) AS usr
+     FROM earnings WHERE user_id = $1 AND hour >= date_trunc('day', now())`,
+    [d.user_id, d.id],
   );
   const r = assign({
     device: { ...d, paused },
     seconds,
     allocation: effAlloc,
     capacityMbps: capacity,
-    todayBytes: Number(today.rows[0].bytes),
+    todayBytes: Number(today.rows[0].dev),
+    userTodayBytes: Number(today.rows[0].usr),
     nowMs: now,
   });
 

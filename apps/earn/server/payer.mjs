@@ -262,6 +262,7 @@ async function fundedRail(preferred, usd) {
   return null;
 }
 
+let lastWaitLog = 0;
 async function payUserWithdrawal() {
   // Oldest first, but strictly on the rail the contributor chose: a Base USDC withdrawal must
   // never arrive as USDG on Robinhood Chain. If that rail is short of float the request stays
@@ -269,6 +270,7 @@ async function payUserWithdrawal() {
   const { rows } = await q(`SELECT id, usd, wallet, rail FROM payouts WHERE status = 'pending' ORDER BY created_at ASC LIMIT 10`);
   let p = null;
   let railId = null;
+  const waiting = [];
   for (const row of rows) {
     if (!isEvmAddress(row.wallet) || !RAILS[row.rail]) continue;
     const [bal, gas] = await Promise.all([tokenBalance(row.rail), gasBalance(row.rail)]);
@@ -277,7 +279,11 @@ async function payUserWithdrawal() {
       railId = row.rail;
       break;
     }
-    console.warn(`[payer] withdrawal #${row.id} ($${Number(row.usd).toFixed(2)} ${RAILS[row.rail].asset}) waits: ${RAILS[row.rail].chain} has ${bal.toFixed(2)} ${RAILS[row.rail].asset} / ${gas.toFixed(5)} ETH`);
+    waiting.push(`#${row.id} $${Number(row.usd).toFixed(2)} ${RAILS[row.rail].asset} (${RAILS[row.rail].chain} has ${bal.toFixed(2)} / ${gas.toFixed(5)} ETH)`);
+  }
+  if (waiting.length && Date.now() - lastWaitLog > 10 * 60_000) {
+    lastWaitLog = Date.now();
+    console.warn(`[payer] ${waiting.length} withdrawal(s) waiting for float: ${waiting.join('; ')}`);
   }
   if (!p) return false;
   await q(`UPDATE payouts SET status = 'processing' WHERE id = $1`, [p.id]);

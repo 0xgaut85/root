@@ -18,6 +18,13 @@ const GB = 1e9;
  * `earnings` keep their value.
  */
 const BASE_DAILY_CAP_GB = 2.5;
+/**
+ * Per-account daily cap across all of its devices (≈ two devices' worth). The device cap
+ * alone was gameable: unpair + re-pair mints a fresh device id with a fresh daily budget,
+ * and some accounts cycled through 30–50 device ids a day. The account cap is computed
+ * from `earnings`, which keeps rows for deleted devices.
+ */
+export const USER_DAILY_CAP_GB = 5;
 
 export function dailyCapBytes(device, allocation) {
   const seedMult = 0.8 + device.seed * 0.45; // 0.8x .. 1.25x per device
@@ -29,7 +36,7 @@ export function dailyCapBytes(device, allocation) {
  * Compute bytes relayed over `seconds` for a device.
  * @returns {{ bytes: number, mbps: number, usd: number, burst: boolean }}
  */
-export function assign({ device, seconds, allocation, capacityMbps, todayBytes, nowMs }) {
+export function assign({ device, seconds, allocation, capacityMbps, todayBytes, userTodayBytes = 0, nowMs }) {
   if (device.paused || allocation <= 0 || seconds <= 0) return { bytes: 0, mbps: 0, usd: 0, burst: false };
 
   const cap = Math.max(5, Math.min(1000, capacityMbps || 40));
@@ -46,11 +53,13 @@ export function assign({ device, seconds, allocation, capacityMbps, todayBytes, 
 
   // Approach the daily cap smoothly, then trickle.
   const capBytes = dailyCapBytes(device, allocation);
-  const remaining = Math.max(0, 1 - todayBytes / capBytes);
+  const remaining = Math.min(Math.max(0, 1 - todayBytes / capBytes), Math.max(0, 1 - userTodayBytes / (USER_DAILY_CAP_GB * GB)));
   util *= remaining < 0.15 ? Math.max(0.05, remaining / 0.15) : 1;
 
   const mbps = ceilingMbps * util;
-  const bytes = Math.round((mbps / 8) * 1e6 * seconds);
+  let bytes = Math.round((mbps / 8) * 1e6 * seconds);
+  // Hard stop at the account cap (the trickle above only slows down; this closes the door).
+  bytes = Math.min(bytes, Math.max(0, Math.round(USER_DAILY_CAP_GB * GB - userTodayBytes)));
   const usd = (bytes / GB) * CONTRIBUTOR_RATE_PER_GB;
   return { bytes, mbps, usd, burst };
 }
