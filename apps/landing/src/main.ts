@@ -20,6 +20,39 @@ const hudIndex = $('[data-hud-index]');
 const hudLabel = $('[data-hud-label]');
 const pill = $('[data-scroll-pill]');
 
+/* ---------------- $ROOT contract address ----------------
+ * Set ROOT_TOKEN_CA to the deployed contract address at launch. While it is
+ * 'TBA' the chip says so and clicking it does nothing beyond a small nudge. */
+const ROOT_TOKEN_CA: string = 'TBA';
+
+{
+  const btn = $<HTMLButtonElement>('[data-token]');
+  const label = $('[data-token-label]');
+  const live = ROOT_TOKEN_CA !== 'TBA';
+  const short = live ? `${ROOT_TOKEN_CA.slice(0, 4)}…${ROOT_TOKEN_CA.slice(-4)}` : 'TBA';
+  label.textContent = short;
+  btn.title = live ? ROOT_TOKEN_CA : 'Contract address announced at launch';
+  let timer = 0;
+  const flash = (text: string) => {
+    label.textContent = text;
+    btn.classList.add('is-copied');
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      label.textContent = short;
+      btn.classList.remove('is-copied');
+    }, 1400);
+  };
+  btn.addEventListener('click', async () => {
+    if (!live) return flash('Soon');
+    try {
+      await navigator.clipboard.writeText(ROOT_TOKEN_CA);
+      flash('Copied');
+    } catch {
+      flash('Copy failed');
+    }
+  });
+}
+
 /* ---------------- Experience (after the loader) ---------------- */
 
 let xpPromise: Promise<Experience> | null = null;
