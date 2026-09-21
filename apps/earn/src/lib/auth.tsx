@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { PrivyProvider, usePrivy } from '@privy-io/react-auth';
 import { setTokenGetter } from './api';
+import { DEMO_TOKEN, isDemo } from './demo';
 
 export type AuthState = {
   ready: boolean;
@@ -9,7 +10,7 @@ export type AuthState = {
   logout: () => Promise<void>;
   email: string | null;
   wallet: string | null;
-  mode: 'privy' | 'dev';
+  mode: 'privy' | 'dev' | 'demo';
 };
 
 const Ctx = createContext<AuthState | null>(null);
@@ -66,13 +67,35 @@ function DevBridge({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 
+function DemoBridge({ children }: { children: ReactNode }) {
+  useMemo(() => {
+    setTokenGetter(async () => DEMO_TOKEN);
+  }, []);
+  const value = useMemo<AuthState>(
+    () => ({
+      ready: true,
+      authenticated: true,
+      login: () => {},
+      logout: async () => {},
+      email: 'demo@rootnetwork.co',
+      wallet: null,
+      mode: 'demo',
+    }),
+    [],
+  );
+  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
+  if (isDemo()) return <DemoBridge>{children}</DemoBridge>;
   if (PRIVY_APP_ID) {
     return (
       <PrivyProvider
         appId={PRIVY_APP_ID}
         config={{
-          loginMethods: ['email', 'google', 'wallet'],
+          // Login methods are not pinned here on purpose: the Privy dashboard
+          // (Authentication → Socials / Basics) decides which providers show up,
+          // so enabling Twitter, Apple, etc. there needs no redeploy.
           appearance: {
             theme: 'light',
             accentColor: '#0a0a0a',
