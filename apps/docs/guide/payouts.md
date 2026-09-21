@@ -15,7 +15,7 @@ Root Network pays in fully-reserved dollar stablecoins, on two rails. You pick o
 | Issuer | Circle | Paxos (Global Dollar Network) |
 | Network | Base, Coinbase's Ethereum L2 (chain ID 8453) | Robinhood Chain, an Arbitrum Orbit L2 (chain ID 4663) |
 | Token contract | `0x8335…2913` | `0x5fc5…d168` |
-| Explorer | [basescan.org](https://basescan.org/address/0x3e32A1b643A81927802E7Fa202709395Ce8D1821) | [robinhoodchain.blockscout.com](https://robinhoodchain.blockscout.com/address/0x3e32A1b643A81927802E7Fa202709395Ce8D1821) |
+| Explorer | [basescan.org](https://basescan.org/address/0x3e32A1b643A81927802E7Fa202709395Ce8D1821) | [robin.etherscan.io](https://robin.etherscan.io/address/0x3e32A1b643A81927802E7Fa202709395Ce8D1821) |
 | Address format | `0x…` (any EVM wallet) | `0x…` (Robinhood wallet or any EVM wallet) |
 | Typical settlement | Under a minute | Under a minute |
 | Fee | None | None |

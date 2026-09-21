@@ -89,7 +89,7 @@ const robinhood = defineChain({
   name: 'Robinhood Chain',
   nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
   rpcUrls: { default: { http: [RAILS['robinhood-usdg'].rpc] } },
-  blockExplorers: { default: { name: 'Blockscout', url: RAILS['robinhood-usdg'].explorer } },
+  blockExplorers: { default: { name: 'Etherscan', url: RAILS['robinhood-usdg'].explorer } },
   fees: { baseFeeMultiplier: 2 },
 });
 // Both L2s move their base fee between our estimate and the block that includes the tx; a

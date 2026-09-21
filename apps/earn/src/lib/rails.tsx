@@ -32,8 +32,8 @@ export const RAILS: Record<RailId, RailMeta> = {
     chain: 'Robinhood Chain',
     assetLogo: '/rails/usdg.png',
     chainLogo: '/rails/robinhood-feather-white.svg',
-    explorerAddr: (a) => `https://robinhoodchain.blockscout.com/address/${a}`,
-    explorerTx: (h) => `https://robinhoodchain.blockscout.com/tx/${h}`,
+    explorerAddr: (a) => `https://robin.etherscan.io/address/${a}`,
+    explorerTx: (h) => `https://robin.etherscan.io/tx/${h}`,
     note: 'Paxos’ Global Dollar on Robinhood Chain (chain ID 4663). Use your Robinhood wallet address or any EVM wallet.',
   },
 };

@@ -27,7 +27,7 @@ export const RAILS = {
     assetName: 'Global Dollar',
     chain: 'Robinhood Chain',
     chainId: 4663,
-    explorer: 'https://robinhoodchain.blockscout.com',
+    explorer: 'https://robin.etherscan.io',
     token: '0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168',
     decimals: 6,
     rpc: process.env.ROBINHOOD_RPC_URL || 'https://rpc.mainnet.chain.robinhood.com',
