@@ -23,7 +23,7 @@ const pill = $('[data-scroll-pill]');
 /* ---------------- $ROOT contract address ----------------
  * Set ROOT_TOKEN_CA to the deployed contract address at launch. While it is
  * 'TBA' the chip says so and clicking it does nothing beyond a small nudge. */
-const ROOT_TOKEN_CA: string = 'TBA';
+const ROOT_TOKEN_CA: string = '0x9a9ce1facc980db73016a86ab8766c1a08049cc2';
 
 {
   const btn = $<HTMLButtonElement>('[data-token]');
