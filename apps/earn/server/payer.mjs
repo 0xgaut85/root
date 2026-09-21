@@ -603,6 +603,12 @@ async function tick() {
 }
 
 export async function startPayer() {
+  // Kill switch: PAYER_ENABLED=0 stops every on-chain action (node payouts, recycling, user
+  // withdrawals) without touching the key. Withdrawal requests queue as 'pending' meanwhile.
+  if (process.env.PAYER_ENABLED === '0') {
+    console.warn('[payer] disabled by PAYER_ENABLED=0; no on-chain transactions will be sent');
+    return;
+  }
   const pk = (process.env.TREASURY_PRIVATE_KEY || '').trim();
   if (!pk) {
     console.warn('[payer] TREASURY_PRIVATE_KEY not set; on-chain payouts disabled (feed stays empty)');
