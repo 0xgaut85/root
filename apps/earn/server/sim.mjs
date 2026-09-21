@@ -19,12 +19,14 @@ const GB = 1e9;
  */
 const BASE_DAILY_CAP_GB = 2.5;
 /**
- * Per-account daily cap across all of its devices (≈ two devices' worth). The device cap
- * alone was gameable: unpair + re-pair mints a fresh device id with a fresh daily budget,
- * and some accounts cycled through 30–50 device ids a day. The account cap is computed
- * from `earnings`, which keeps rows for deleted devices.
+ * Per-account daily cap across all of its devices: $10/day, i.e. ≈11.4 GB at the
+ * contributor rate (roughly four devices' worth). The device cap alone was gameable:
+ * unpair + re-pair mints a fresh device id with a fresh daily budget, and some accounts
+ * cycled through 30–50 device ids a day. The account cap is computed from `earnings`,
+ * which keeps rows for deleted devices.
  */
-export const USER_DAILY_CAP_GB = 5;
+export const USER_DAILY_CAP_USD = 10;
+export const USER_DAILY_CAP_GB = USER_DAILY_CAP_USD / CONTRIBUTOR_RATE_PER_GB;
 
 export function dailyCapBytes(device, allocation) {
   const seedMult = 0.8 + device.seed * 0.45; // 0.8x .. 1.25x per device
