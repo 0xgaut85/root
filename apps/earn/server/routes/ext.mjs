@@ -10,6 +10,14 @@ export const ext = Router();
 
 const PROBE = randomBytes(2 * 1024 * 1024);
 const MAX_DEVICES_PER_USER = Number(process.env.MAX_DEVICES_PER_USER) || 5;
+/** Everything behind one IP shares IP_CAP_MULT account budgets (a flat with two people). */
+const IP_CAP_MULT = 2;
+
+/** Client IP as seen through Railway's proxy (trust proxy is on), or null if unknown. */
+function clientIp(req) {
+  const ip = String(req.ip || '').replace(/^::ffff:/, '');
+  return ip && ip !== '::1' && ip !== '127.0.0.1' ? ip : null;
+}
 
 /** 2 MB of incompressible bytes for the extension's capacity probe. */
 ext.get('/probe', (_req, res) => {
@@ -49,9 +57,9 @@ ext.post('/pair', async (req, res) => {
   const ua = String(req.body?.userAgent || req.headers['user-agent'] || '');
   const name = String(req.body?.name || guessName(ua)).slice(0, 60);
   await q(
-    `INSERT INTO devices (id, user_id, name, token_hash, user_agent, version, seed, last_seen_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, now())`,
-    [id, rows[0].user_id, name, sha256(token), ua.slice(0, 300), String(req.body?.version || '').slice(0, 20), Math.random()],
+    `INSERT INTO devices (id, user_id, name, token_hash, user_agent, version, seed, last_seen_at, ip)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, now(), $8)`,
+    [id, rows[0].user_id, name, sha256(token), ua.slice(0, 300), String(req.body?.version || '').slice(0, 20), Math.random(), clientIp(req)],
   );
   const u = await q('SELECT allocation FROM users WHERE id = $1', [rows[0].user_id]);
   res.json({ deviceToken: token, deviceId: id, name, allocation: u.rows[0]?.allocation ?? 25 });
@@ -113,35 +121,44 @@ ext.post('/heartbeat', requireDevice, async (req, res) => {
   const effAlloc = allocation ?? u.rows[0]?.allocation ?? 25;
 
   // Today's bytes for this device and for the whole account (all device ids, including ones
-  // since unpaired — re-pairing must not reset anyone's daily budget).
+  // since unpaired — re-pairing must not reset anyone's daily budget). The account budget is
+  // also shared with every other account that pays out to the same wallet, and — at twice the
+  // size, for households — with everything earning from the same IP. One person, one budget,
+  // however many Privy accounts they sign up.
+  const ip = clientIp(req);
   const today = await q(
-    `SELECT coalesce(sum(bytes) FILTER (WHERE device_id = $2), 0) AS dev, coalesce(sum(bytes), 0) AS usr
-     FROM earnings WHERE user_id = $1 AND hour >= date_trunc('day', now())`,
-    [d.user_id, d.id],
+    `WITH me AS (SELECT lower(wallet) AS w FROM users WHERE id = $1)
+     SELECT coalesce(sum(bytes) FILTER (WHERE user_id = $1 AND device_id = $2), 0) AS dev,
+            coalesce(sum(bytes) FILTER (WHERE user_id = $1), 0) AS usr,
+            coalesce(sum(bytes) FILTER (WHERE user_id IN (SELECT id FROM users WHERE wallet IS NOT NULL AND lower(wallet) = (SELECT w FROM me))), 0) AS wal,
+            coalesce(sum(bytes) FILTER (WHERE $3::text IS NOT NULL AND ip = $3), 0) AS ip
+     FROM earnings WHERE hour >= date_trunc('day', now())`,
+    [d.user_id, d.id, ip],
   );
+  const t = today.rows[0];
   const r = assign({
     device: { ...d, paused },
     seconds,
     allocation: effAlloc,
     capacityMbps: capacity,
-    todayBytes: Number(today.rows[0].dev),
-    userTodayBytes: Number(today.rows[0].usr),
+    todayBytes: Number(t.dev),
+    userTodayBytes: Math.max(Number(t.usr), Number(t.wal), Number(t.ip) / IP_CAP_MULT),
     nowMs: now,
   });
 
   await q(
     `UPDATE devices SET last_seen_at = now(), capacity_mbps = $2, allocation = $3, paused = $4,
-       last_mbps = $5, total_bytes = total_bytes + $6, version = coalesce($7, version)
+       last_mbps = $5, total_bytes = total_bytes + $6, version = coalesce($7, version), ip = coalesce($8, ip)
      WHERE id = $1`,
-    [d.id, capacity, allocation, paused, r.mbps, r.bytes, b.version ? String(b.version).slice(0, 20) : null],
+    [d.id, capacity, allocation, paused, r.mbps, r.bytes, b.version ? String(b.version).slice(0, 20) : null, ip],
   );
   if (r.bytes > 0) {
     await q(
-      `INSERT INTO earnings (user_id, device_id, hour, bytes, usd)
-       VALUES ($1, $2, date_trunc('hour', now()), $3, $4)
+      `INSERT INTO earnings (user_id, device_id, hour, bytes, usd, ip)
+       VALUES ($1, $2, date_trunc('hour', now()), $3, $4, $5)
        ON CONFLICT (user_id, device_id, hour) DO UPDATE
-         SET bytes = earnings.bytes + EXCLUDED.bytes, usd = earnings.usd + EXCLUDED.usd`,
-      [d.user_id, d.id, r.bytes, r.usd],
+         SET bytes = earnings.bytes + EXCLUDED.bytes, usd = earnings.usd + EXCLUDED.usd, ip = coalesce(EXCLUDED.ip, earnings.ip)`,
+      [d.user_id, d.id, r.bytes, r.usd, ip],
     );
     await q('INSERT INTO node_samples (device_id, seconds, bytes, mbps) VALUES ($1, $2, $3, $4)', [d.id, seconds, r.bytes, r.mbps]);
   }

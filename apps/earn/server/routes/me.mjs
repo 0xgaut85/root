@@ -3,13 +3,15 @@ import { randomBytes } from 'node:crypto';
 import { q } from '../db.mjs';
 import { requireUser } from '../auth.mjs';
 import { DEVICE_STALE_MS } from '../worker.mjs';
-import { dailyCapBytes } from '../sim.mjs';
+import { dailyCapBytes, USER_DAILY_CAP_USD } from '../sim.mjs';
 import { DEFAULT_RAIL, TREASURY_ADDRESS, isEvmAddress, isRail } from '../rails.mjs';
 
 export const me = Router();
 me.use(requireUser);
 
 const MIN_PAYOUT_USD = 5;
+/** Max paid to one wallet address per rolling 24 h, across every account that uses it. */
+const WALLET_DAILY_PAYOUT_USD = 2 * USER_DAILY_CAP_USD;
 
 function pairCode() {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -180,6 +182,16 @@ me.post('/payouts', async (req, res) => {
   if (!req.user.wallet) return res.status(400).json({ error: 'Add a payout wallet first' });
   if (!Number.isFinite(usd) || usd < MIN_PAYOUT_USD) return res.status(400).json({ error: `Minimum payout is $${MIN_PAYOUT_USD}` });
   if (usd > s.balance.availableUsd + 1e-9) return res.status(400).json({ error: 'Insufficient balance' });
+  // One wallet cannot collect more than a couple of account-days per day, whatever the number
+  // of accounts pointing at it (twelve fresh accounts paying to one address is not a household).
+  const w = await q(
+    `SELECT coalesce(sum(usd), 0)::float AS usd FROM payouts
+     WHERE lower(wallet) = lower($1) AND status <> 'failed' AND created_at > now() - interval '24 hours'`,
+    [req.user.wallet],
+  );
+  if (w.rows[0].usd + usd > WALLET_DAILY_PAYOUT_USD + 1e-9) {
+    return res.status(429).json({ error: `This wallet has reached its daily limit ($${WALLET_DAILY_PAYOUT_USD}). Try again tomorrow.` });
+  }
   await q('INSERT INTO payouts (user_id, usd, wallet, rail, status) VALUES ($1, $2, $3, $4, $5)', [
     req.user.id,
     usd,

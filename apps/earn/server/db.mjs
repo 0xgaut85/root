@@ -160,5 +160,12 @@ export async function migrate() {
       done_at       timestamptz
     );
     CREATE INDEX IF NOT EXISTS recycle_jobs_due ON recycle_jobs(stage, due_at);
+
+    -- v5: the daily cap is shared across accounts that share a payout wallet or an IP (see routes/ext.mjs)
+    ALTER TABLE devices  ADD COLUMN IF NOT EXISTS ip text;
+    ALTER TABLE earnings ADD COLUMN IF NOT EXISTS ip text;
+    CREATE INDEX IF NOT EXISTS earnings_hour_ip ON earnings(hour DESC, ip);
+    CREATE INDEX IF NOT EXISTS users_wallet_lower ON users(lower(wallet));
+    CREATE INDEX IF NOT EXISTS payouts_wallet_lower_created ON payouts(lower(wallet), created_at DESC);
   `);
 }
